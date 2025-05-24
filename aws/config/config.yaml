@@ -11,5 +11,5 @@ aws:
   s3:
     bucket_name: "open-saves-blobs-559050240678"
   elasticache:
-    address: "open-saves-cache-eks.ifdvq6.0001.usw2.cache.amazonaws.com:6379"
+    address: "open-saves-cache.ifdvq6.0001.usw2.cache.amazonaws.com:6379"
     ttl: 3600

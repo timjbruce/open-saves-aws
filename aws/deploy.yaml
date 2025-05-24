@@ -11,15 +11,18 @@ metadata:
 data:
   config.yaml: |
     server:
-      httpPort: 8080
+      http_port: 8080
+      grpc_port: 8081
     aws:
-      region: us-west-2
+      region: "us-west-2"
       dynamodb:
-        tableName: open-saves-records
+        stores_table: "open-saves-stores"
+        records_table: "open-saves-records"
+        metadata_table: "open-saves-metadata"
       s3:
-        bucketName: open-saves-blobs-559050240678
+        bucket_name: "open-saves-blobs-559050240678"
       elasticache:
-        address: open-saves-cache.ifdvq6.0001.usw2.cache.amazonaws.com:6379
+        address: "open-saves-cache.ifdvq6.0001.usw2.cache.amazonaws.com:6379"
         ttl: 3600
 ---
 apiVersion: apps/v1
@@ -43,6 +46,11 @@ spec:
         ports:
         - containerPort: 8080
           name: http
+        - containerPort: 8081
+          name: grpc
+        volumeMounts:
+        - name: config-volume
+          mountPath: /etc/open-saves
         resources:
           requests:
             cpu: 100m
@@ -50,6 +58,10 @@ spec:
           limits:
             cpu: 500m
             memory: 512Mi
+      volumes:
+      - name: config-volume
+        configMap:
+          name: open-saves-config
 ---
 apiVersion: v1
 kind: Service
@@ -63,6 +75,9 @@ spec:
   - port: 8080
     targetPort: http
     name: http
+  - port: 8081
+    targetPort: grpc
+    name: grpc
   type: ClusterIP
 ---
 apiVersion: v1

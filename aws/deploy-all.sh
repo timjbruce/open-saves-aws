@@ -12,7 +12,7 @@ echo -e "${YELLOW}This script will build and deploy Open Saves to AWS${NC}"
 
 # Check for required tools
 echo -e "${YELLOW}Checking for required tools...${NC}"
-for tool in aws kubectl docker go; do
+for tool in aws kubectl docker go eksctl; do
   if ! command -v $tool &> /dev/null; then
     echo -e "${RED}Error: $tool is not installed. Please install it before continuing.${NC}"
     exit 1
@@ -296,15 +296,14 @@ echo -e "${YELLOW}Using VPC ID: ${VPC_ID} for both EKS and ElastiCache${NC}"
 SUBNET_IDS=$(aws ec2 describe-subnets --filters "Name=vpc-id,Values=$VPC_ID" --query 'Subnets[*].SubnetId' --output text --region $AWS_REGION)
 SUBNET_ARRAY=($SUBNET_IDS)
 
-# Create security group for Redis in the EKS VPC
-if ! aws ec2 describe-security-groups --filters "Name=group-name,Values=open-saves-redis-sg" "Name=vpc-id,Values=$VPC_ID" --region $AWS_REGION &> /dev/null; then
-  echo -e "${YELLOW}Creating security group for Redis in the EKS VPC...${NC}"
-  REDIS_SG_ID=$(aws ec2 create-security-group --group-name open-saves-redis-sg --description "Security group for Open Saves Redis" --vpc-id $VPC_ID --query 'GroupId' --output text --region $AWS_REGION)
-  aws ec2 authorize-security-group-ingress --group-id $REDIS_SG_ID --protocol tcp --port 6379 --cidr 0.0.0.0/0 --region $AWS_REGION
-else
-  REDIS_SG_ID=$(aws ec2 describe-security-groups --filters "Name=group-name,Values=open-saves-redis-sg" "Name=vpc-id,Values=$VPC_ID" --query 'SecurityGroups[0].GroupId' --output text --region $AWS_REGION)
-  echo -e "${GREEN}Redis security group already exists: ${REDIS_SG_ID}${NC}"
-fi
+# Create a new security group for Redis with timestamp to ensure uniqueness
+echo -e "${YELLOW}Creating security group for Redis in the EKS VPC...${NC}"
+REDIS_SG_ID=$(aws ec2 create-security-group --group-name open-saves-redis-sg-$(date +%s) --description "Security group for Open Saves Redis" --vpc-id $VPC_ID --query 'GroupId' --output text --region $AWS_REGION)
+echo -e "${GREEN}Created Redis security group: ${REDIS_SG_ID}${NC}"
+
+# Add ingress rule for Redis port
+aws ec2 authorize-security-group-ingress --group-id $REDIS_SG_ID --protocol tcp --port 6379 --cidr 0.0.0.0/0 --region $AWS_REGION
+echo -e "${GREEN}Added ingress rule to security group${NC}"
 
 # Create subnet group if it doesn't exist
 if ! aws elasticache describe-cache-subnet-groups --cache-subnet-group-name open-saves-cache-subnet --region $AWS_REGION &> /dev/null; then
@@ -321,6 +320,7 @@ fi
 # Create Redis cluster if it doesn't exist
 if ! aws elasticache describe-cache-clusters --cache-cluster-id $REDIS_CLUSTER --region $AWS_REGION &> /dev/null; then
   echo -e "${YELLOW}Creating ElastiCache Redis cluster in the EKS VPC...${NC}"
+  echo -e "${GREEN}Using security group ID: ${REDIS_SG_ID}${NC}"
   aws elasticache create-cache-cluster \
     --cache-cluster-id $REDIS_CLUSTER \
     --engine redis \
@@ -351,8 +351,25 @@ echo -e "${YELLOW}Step 9: Updating kubeconfig...${NC}"
 aws eks update-kubeconfig --name $CLUSTER_NAME --region $AWS_REGION
 echo -e "${GREEN}Kubeconfig updated.${NC}"
 
-# Step 10: Update config.yaml with the correct values
-echo -e "${YELLOW}Step 10: Updating configuration...${NC}"
+# Step 10: Create IAM OIDC provider for EKS
+echo -e "${YELLOW}Step 10: Creating IAM OIDC provider for EKS...${NC}"
+eksctl utils associate-iam-oidc-provider --cluster $CLUSTER_NAME --approve --region $AWS_REGION
+echo -e "${GREEN}IAM OIDC provider created.${NC}"
+
+# Step 11: Create IAM service account for Open Saves
+echo -e "${YELLOW}Step 11: Creating IAM service account for Open Saves...${NC}"
+eksctl create iamserviceaccount \
+  --name open-saves-sa \
+  --namespace $NAMESPACE \
+  --cluster $CLUSTER_NAME \
+  --attach-policy-arn arn:aws:iam::aws:policy/AmazonDynamoDBFullAccess \
+  --attach-policy-arn arn:aws:iam::aws:policy/AmazonS3FullAccess \
+  --approve \
+  --region $AWS_REGION
+echo -e "${GREEN}IAM service account created.${NC}"
+
+# Step 12: Update config.yaml with the correct values
+echo -e "${YELLOW}Step 12: Updating configuration...${NC}"
 mkdir -p config
 cat > config/config.yaml << EOF
 server:
@@ -373,8 +390,8 @@ aws:
 EOF
 echo -e "${GREEN}Configuration updated.${NC}"
 
-# Step 11: Create deployment YAML
-echo -e "${YELLOW}Step 11: Creating deployment YAML...${NC}"
+# Step 13: Create deployment YAML
+echo -e "${YELLOW}Step 13: Creating deployment YAML...${NC}"
 cat > deploy.yaml << EOF
 apiVersion: v1
 kind: Namespace
@@ -418,6 +435,7 @@ spec:
       labels:
         app: open-saves
     spec:
+      serviceAccountName: open-saves-sa
       containers:
       - name: open-saves
         image: $ECR_REPO_URI:latest
@@ -494,17 +512,17 @@ spec:
 EOF
 echo -e "${GREEN}Deployment YAML created.${NC}"
 
-# Step 12: Deploy to Kubernetes
-echo -e "${YELLOW}Step 12: Deploying to Kubernetes...${NC}"
+# Step 14: Deploy to Kubernetes
+echo -e "${YELLOW}Step 14: Deploying to Kubernetes...${NC}"
 kubectl apply -f deploy.yaml
 echo -e "${GREEN}Deployment applied.${NC}"
 
-# Step 13: Wait for deployment to be ready
-echo -e "${YELLOW}Step 13: Waiting for deployment to be ready...${NC}"
+# Step 15: Wait for deployment to be ready
+echo -e "${YELLOW}Step 15: Waiting for deployment to be ready...${NC}"
 kubectl -n $NAMESPACE rollout status deployment/open-saves --timeout=300s || true
 
-# Step 14: Get service URL
-echo -e "${YELLOW}Step 14: Getting service URL...${NC}"
+# Step 16: Get service URL
+echo -e "${YELLOW}Step 16: Getting service URL...${NC}"
 echo -e "${YELLOW}Waiting for Load Balancer to be provisioned (this may take a few minutes)...${NC}"
 sleep 60
 
@@ -517,4 +535,4 @@ echo -e "${GREEN}You can test the deployment with:${NC}"
 echo -e "${GREEN}curl http://${SERVICE_URL}/health${NC}"
 echo -e "${GREEN}curl http://${SERVICE_URL}/api/stores${NC}"
 echo -e "${GREEN}To run the test client:${NC}"
-echo -e "${GREEN}./test-client.sh http://${SERVICE_URL}${NC}"
+echo -e "${GREEN}./open-saves-test.sh http://${SERVICE_URL}${NC}"
