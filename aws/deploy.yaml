@@ -1,0 +1,100 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: open-saves
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: open-saves-config
+  namespace: open-saves
+data:
+  config.yaml: |
+    server:
+      httpPort: 8080
+    aws:
+      region: us-west-2
+      dynamodb:
+        tableName: open-saves-records
+      s3:
+        bucketName: open-saves-blobs-559050240678
+      elasticache:
+        address: open-saves-cache.ifdvq6.0001.usw2.cache.amazonaws.com:6379
+        ttl: 3600
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: open-saves
+  namespace: open-saves
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: open-saves
+  template:
+    metadata:
+      labels:
+        app: open-saves
+    spec:
+      containers:
+      - name: open-saves
+        image: 559050240678.dkr.ecr.us-west-2.amazonaws.com/open-saves:latest
+        ports:
+        - containerPort: 8080
+          name: http
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: open-saves
+  namespace: open-saves
+spec:
+  selector:
+    app: open-saves
+  ports:
+  - port: 8080
+    targetPort: http
+    name: http
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: open-saves-lb
+  namespace: open-saves
+spec:
+  selector:
+    app: open-saves
+  ports:
+  - port: 80
+    targetPort: http
+    name: http
+  type: LoadBalancer
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: open-saves-hpa
+  namespace: open-saves
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: open-saves
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70

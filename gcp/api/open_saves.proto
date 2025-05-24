@@ -1,0 +1,800 @@
+// Copyright 2020 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+syntax = "proto3";
+
+package opensaves;
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+import "google/rpc/status.proto";
+
+option go_package = "github.com/googleforgames/open-saves;opensaves";
+
+// Public interface of the Open Saves service.
+service OpenSaves {
+  // CreateStore creates and returns a new store.
+  rpc CreateStore(CreateStoreRequest) returns (Store) {}
+
+  // GetStore fetches store with the specified key.
+  rpc GetStore(GetStoreRequest) returns (Store) {}
+
+  // ListStore returns stores matching the provided criteria.
+  rpc ListStores(ListStoresRequest) returns (ListStoresResponse) {}
+
+  // DeleteStore deletes a single store with the specified key.
+  rpc DeleteStore(DeleteStoreRequest) returns (google.protobuf.Empty) {}
+
+  // CreateRecord creates a new record. This returns an error if the
+  // specified key already exists.
+  rpc CreateRecord(CreateRecordRequest) returns (Record) {}
+
+  // GetRecord returns a record with the specified key.
+  rpc GetRecord(GetRecordRequest) returns (Record) {}
+
+  // GetRecords fetches multiple records by keys.
+  rpc GetRecords(GetRecordsRequest) returns (GetRecordsResponse) {}
+
+  // QueryRecords performs a query and returns matching records.
+  rpc QueryRecords(QueryRecordsRequest) returns (QueryRecordsResponse) {}
+
+  // UpdateRecord updates an existing record. This returns an error and
+  // does not create a new record if the key doesn't exist.
+  rpc UpdateRecord(UpdateRecordRequest) returns (Record) {}
+
+  // DeleteRecord deletes a single record with the specified key.
+  rpc DeleteRecord(DeleteRecordRequest) returns (google.protobuf.Empty) {}
+
+  // CreateBlob adds a new blob to a record.
+  rpc CreateBlob(stream CreateBlobRequest) returns (BlobMetadata) {}
+
+  // CreateChunkedBlob starts a new chunked blob upload session.
+  rpc CreateChunkedBlob(CreateChunkedBlobRequest)
+      returns (CreateChunkedBlobResponse) {}
+
+  // CreateChunkUrls returns the TTL signed url for the record blob chunks.
+  rpc CreateChunkUrls(CreateChunkUrlsRequest) returns (CreateChunkUrlsResponse) {}
+
+  // UploadChunk uploads and stores each each chunk.
+  rpc UploadChunk(stream UploadChunkRequest) returns (ChunkMetadata) {}
+
+  // CommitChunkedUpload commits a chunked blob upload session and
+  // makes the blob available for reads. An optional record can be passed
+  // to perform an update within the same transaction.
+  rpc CommitChunkedUpload(CommitChunkedUploadRequest) returns (BlobMetadata) {}
+
+  // AbortChunkedUploads aborts a chunked blob upload session and
+  // discards temporary objects.
+  rpc AbortChunkedUpload(AbortChunkedUploadRequest)
+      returns (google.protobuf.Empty) {}
+
+  // GetBlob retrieves a blob object in a record.
+  // Currently this method does not support chunked blobs and
+  // returns an UNIMPLEMENTED error if called for chunked blobs.
+  // TODO(yuryu): Support chunked blobs and return such objects entirely.
+  rpc GetBlob(GetBlobRequest) returns (stream GetBlobResponse) {}
+
+  // GetBlobChunk returns a chunk of a blob object uploaded using
+  // CreateChunkedBlob. It returns an INVALID_ARGUMENT error if the blob is not
+  // a chunked object.
+  rpc GetBlobChunk(GetBlobChunkRequest) returns (stream GetBlobChunkResponse) {}
+
+  // DeleteBlob removes an blob object from a record.
+  rpc DeleteBlob(DeleteBlobRequest) returns (google.protobuf.Empty) {}
+
+  // Ping returns the same string provided by the client.
+  // The string is optional and the server returns an empty string if
+  // omitted.
+  rpc Ping(PingRequest) returns (PingResponse) {}
+
+  // CompareAndSwap compares the property to old_value and updates the property to value
+  // if the old_value and the current property are equal.
+  // The updated field in CompareAndSwapResponse is set to true if the swap is executed.
+  // For example, CompareAndSwap(property, value = 42, old_value = 24) will set the
+  // property to 42 if the current value is 24.
+  // CompareAndSwap also supports swapping with a value of another type, e.g.
+  // CompareAndSwap(property, value = "42", old_value = 24).
+  // Otherwise it will not update the property and return the current (unchanged) value
+  // and updated = false. The operation is executed atomically.
+  // Errors:
+  //   - NotFound: the requested record or property was not found.
+  rpc CompareAndSwap(CompareAndSwapRequest) returns (CompareAndSwapResponse) {}
+
+  // CompareAndSwapGreaterInt compares the number of an integer property to value and
+  // updates the property if the new value is greater than the current value.
+  // The updated field in AtomicResponse is set to true if the swap is executed.
+  // For example, CompareAndSwapGreaterInt(property, value = 42) will replace property with 42
+  // and return {value = old value, updated = true} if 42 > property.
+  // Otherwise it will not update the property and return the current (unchanged) value
+  // and updated = false. The operation is executed atomically.
+  // Errors:
+  //   - NotFound: the requested record or property was not found.
+  //   - InvalidArgument: the requested property was not an integer.
+  rpc CompareAndSwapGreaterInt(AtomicIntRequest) returns (AtomicIntResponse) {}
+
+  // CompareAndSwapLessInt does the same operation as CompareAndSwapGreaterInt except
+  // the condition is the new value is less than the old value.
+  rpc CompareAndSwapLessInt(AtomicIntRequest) returns (AtomicIntResponse) {}
+
+  // AtomicAddInt adds a number to an integer property atomically.
+  // For example, AtomicAdd(property, 42) will run property += 42 and return the old value.
+  // The updated field in AtomicIntResponse is always set to true.
+  // Errors:
+  //   - NotFound: the requested record or property was not found.
+  //   - InvalidArgument: the requested property was not an integer.
+  rpc AtomicAddInt(AtomicIntRequest) returns (AtomicIntResponse) {}
+
+  // AtomicSubInt does the same except it subtracts a number.
+  rpc AtomicSubInt(AtomicIntRequest) returns (AtomicIntResponse) {}
+
+  // AtomicInc increments the number of an integer property if less than upper_bound.
+  // Otherwise it resets the property to lower_bound.
+  // if (property < upper_bound) {
+  //   property++
+  // } else {
+  //   property = lower_bound
+  // }
+  // This makes the property an incrementing counter between [lower_bound, upper_bound].
+  // It returns the old value of the property.
+  // The updated field in AtomicIntResponse is set to true.
+  // Errors:
+  //   - NotFound: the requested record or property was not found.
+  //   - InvalidArgument: the requested property was not an integer.
+  rpc AtomicInc(AtomicIncRequest) returns (AtomicIntResponse) {}
+
+  // AtomicDec decrements the number of an integer property by one if more than lower_bound.
+  // Otherwise it resets the property to upper_bound.
+  // if (lower_bound < property) {
+  //   property--
+  // } else {
+  //   property = upper_bound
+  // }
+  // This makes the property a decrementing counter between [lower_bound, upper_bound].
+  // It returns the old value of the property.
+  // The updated field in AtomicIntResponse is always set to true.
+  // Errors:
+  //   - NotFound: the requested record or property was not found.
+  //   - InvalidArgument: the requested property was not an integer.
+  rpc AtomicDec(AtomicIncRequest) returns (AtomicIntResponse) {}
+}
+
+// Property represents typed data in Open Saves.
+// This is limited to one type per key.
+message Property {
+  // Supported structured data types
+  enum Type {
+    DATATYPE_UNDEFINED = 0;
+    INTEGER = 1;
+    STRING = 2;
+    BOOLEAN = 3;
+  }
+
+  Type type = 1;
+  oneof value {
+    int64 integer_value = 2;
+    string string_value = 3;
+    bool boolean_value = 4;
+  }
+}
+
+// Record represents each entity in the Open Saves database.
+message Record {
+  // key is the user defined primary key.
+  // It is recommended to use uniformally distributed key (e.g. UUID) rather
+  // than monotonically increasing values for performance reasons. See
+  // https://cloud.google.com/datastore/docs/best-practices#keys for details.
+  string key = 1;
+
+  // Byte length of the blob (read-only)
+  int64 blob_size = 3;
+
+  // Typed values that are indexed and searchable.
+  // The number of properties allowed in a record is backend dependent.
+  map<string, Property> properties = 4;
+
+  // owner_id is the owner of the record, represented as an external user ID.
+  // Open Saves doesn't maintain list of valid users and it is the
+  // responsibility of the client to keep track of user IDs.
+  string owner_id = 5;
+
+  // tags are queryable strings to categorize records
+  // Examples: "player:1", "system", "inventory:xxx"
+  repeated string tags = 6;
+
+  // created_at is the point in time in UTC when the Record is created
+  // on the Open Saves server. It is managed and set by the server.
+  google.protobuf.Timestamp created_at = 7;
+
+  // updated_at is the point in time in UTC when the Record is updated
+  // on the Open Saves server. It is managed by the server and updated every
+  // time the Record is updated.
+  google.protobuf.Timestamp updated_at = 8;
+
+  // chunked is set true if the attached blob is chunked, otherwise false.
+  bool chunked = 9;
+
+  // The number of chunks in the associated chunked blob.
+  int64 chunk_count = 10;
+
+  // Opaque string where you can store any utf-8 string (e.g. JSON) that is too
+  // big and does not fit in the properties. This will not be indexed or
+  // queryable.
+  // The maximum length is 1,048,487 bytes on Datastore but the actual limit
+  // might be smaller because the total Record size is capped at 1,048,572
+  // bytes.
+  string opaque_string = 11;
+
+  // Signature is a server-generated unique UUID that is updated each time
+  // the server updates the record. The server returns the current signature
+  // for read requests. The client may optionally populate this field and send
+  // update requests, and the server will check the value against the latest value
+  // and abort the request if they don't match.
+  bytes signature = 12;
+
+  // expires_at is the point in time in UTC when the Record is marked to be collected
+  // by the TTL feature on the Open Saves server. It is optional and if it is not provided
+  // then the object will never expire.
+  google.protobuf.Timestamp expires_at = 13;
+}
+
+// Performance optimization hints for the server.
+// The server may silently ignore the hints when not feasible.
+message Hint {
+  // If true, do not cache the record for future requests.
+  bool do_not_cache = 1;
+
+  // If true, skip the cache check and always check the metadata server.
+  // If false, allow file size to determine cache checks.
+  bool skip_cache = 2;
+
+  // If true, always store the blob in blob storage, rather than in the metadata
+  // server. If false, allow file size to determine where to store the blob.
+  bool force_blob_store = 3;
+
+  // Tells the server to not use blob storage. Always store the blob into
+  // the metadata entity. The server will return an error if the blob is too
+  // large. The exact size limit depends on the backend implementation.
+  bool force_inline_blob = 4;
+}
+
+// Store represents an internal bucket to contain records.
+message Store {
+  // key is the user defined primary key.
+  // It is recommended to use uniformally distributed key (e.g. UUID) rather
+  // than monotonically increasing values for performance reasons. See
+  // https://cloud.google.com/datastore/docs/best-practices#keys for details.
+  string key = 1;
+
+  // name is a user defined name of the store.
+  // It is indexed and queriable with ListStore, but is otherwise opaque to the
+  // server.
+  string name = 2;
+
+  // tags are queryable strings to categorize stores
+  // Examples: "player:1", "system", "inventory:xxx"
+  repeated string tags = 3;
+
+  // owner_id is the owner of the store, represented as an external user ID.
+  // Open Saves doesn't maintain list of valid users and it is the
+  // responsibility of the client to keep track of user IDs.
+  string owner_id = 4;
+
+  // created_at is the point in time in UTC when the Store is created
+  // on the Open Saves server. It is managed and set by the server.
+  google.protobuf.Timestamp created_at = 5;
+
+  // updated_at is the point in time in UTC when the Store is updated
+  // on the Open Saves server. It is managed by the server and updated every
+  // time the Store is updated.
+  google.protobuf.Timestamp updated_at = 6;
+}
+
+message CreateStoreRequest {
+  // Store to create.
+  Store store = 1;
+}
+
+message GetStoreRequest {
+  // The key of the store to retrieve.
+  string key = 1;
+}
+
+// ListStoresRequest contains conditions to filter stores.
+// Multiple conditions are AND'ed together.
+message ListStoresRequest {
+  // Store name. This is an exact match.
+  string name = 1;
+
+  // List of tags
+  repeated string tags = 2;
+
+  // owner_id is the owner of stores, represented as an external user ID.
+  string owner_id = 3;
+}
+
+message ListStoresResponse {
+  // List of stores that match the provided criteria.
+  repeated Store stores = 1;
+}
+
+message DeleteStoreRequest {
+  // The key of the store to delete.
+  string key = 1;
+}
+
+message CreateRecordRequest {
+  // The key of the store to create the record into.
+  string store_key = 1;
+
+  // The record to create.
+  Record record = 2;
+
+  // Performance hints.
+  Hint hint = 3;
+}
+
+message GetRecordRequest {
+  // The key of the store that the record belongs to.
+  string store_key = 1;
+
+  // The key of the record to get.
+  string key = 2;
+
+  // Performance hints.
+  Hint hint = 3;
+}
+
+message GetRecordsRequest {
+  // The keys of the stores the records belongs to.
+  repeated string store_keys = 1;
+
+  // The keys of the records to get.
+  repeated string keys = 2;
+}
+
+// QueryRecordsRequest contains conditions to search particular records.
+// Multiple conditions are AND'ed together.
+message QueryRecordsRequest {
+  // store_key is the primary key of the store.
+  // Optional. The method queries all stores when omitted.
+  string store_key = 1;
+
+  // List of filters
+  repeated QueryFilter filters = 2;
+
+  // List of tags
+  repeated string tags = 3;
+
+  // owner_id is the owner of records, represented as an external user ID.
+  string owner_id = 4;
+
+  // List of sort orders to return records. These SortOrders are applied
+  // in sequence.
+  repeated SortOrder sort_orders = 5;
+
+  // the limit of the number of records to return.
+  int32 limit = 6;
+
+  // If keys_only is set to true, the server will only return records.key
+  // and store_keys in the QueryRecordsResponse message.
+  bool keys_only = 7;
+
+  // Number of records to skip when performing queries.
+  int32 offset = 8;
+
+  // optional -If tags array should be queried using AND or ANY method
+  TagFilterMode tagFilterMode = 9;
+}
+
+// FilterOperator has a list of comperators.
+enum FilterOperator {
+  // =
+  EQUAL = 0;
+  // >
+  GREATER = 1;
+  // <
+  LESS = 2;
+  // >=
+  GREATER_OR_EQUAL = 3;
+  // <=
+  LESS_OR_EQUAL = 4;
+}
+
+// TagFilterMode is a mode selector for tag filtering.
+enum TagFilterMode {
+  // AND
+  AND = 0;
+  // OR
+  OR = 1;
+}
+
+// QueryFilter is a filtering condition when querying records.
+message QueryFilter {
+  // Propety name of the filter.
+  string property_name = 1;
+
+  // Operator of the filter.
+  FilterOperator operator = 2;
+
+  // Value to compare the property with.
+  Property value = 3;
+}
+
+// SortOrder is a way to order records returned by QueryRecords.
+message SortOrder {
+  // Direction is the ways to sort a list of records returned by querying.
+  enum Direction {
+    // Sort by ascending order.
+    ASC = 0;
+    // Sort by descending order.
+    DESC = 1;
+  }
+
+  // Direction to sort by (either ascending or descending).
+  Direction direction = 2;
+
+  // Property to sort by, which can either be system defined properties
+  // or a user property.
+  enum Property {
+    UPDATED_AT = 0;
+    CREATED_AT = 1;
+    USER_PROPERTY = 2;
+  }
+
+  // Property to sort by. If using a user defined property, user_property_name
+  // must be passed in as well.
+  Property property = 3;
+
+  // The name of the user defined property.
+  string user_property_name = 4;
+}
+
+message GetRecordsResponse {
+  message Result {
+    google.rpc.Status status = 1;
+    string store_key = 2;
+    Record record = 3;
+  }
+  repeated Result results = 1;
+}
+
+message QueryRecordsResponse {
+  // List of records that match the criteria.
+  repeated Record records = 1;
+
+  // List of store keys that each of the records belongs to.
+  // The order of keys is the same as the records field,
+  // e.g. store_keys[0] is the store for records[0], and so on.
+  repeated string store_keys = 2;
+}
+
+message UpdateRecordRequest {
+  // The key of the store that the record belongs to.
+  string store_key = 1;
+
+  // The content to update the record with.
+  Record record = 2;
+
+  // Performance hints.
+  Hint hint = 3;
+}
+
+message DeleteRecordRequest {
+  // The key of the store that the record belongs to.
+  string store_key = 1;
+
+  // The key of the record to delete.
+  string key = 2;
+}
+
+// CreateBlobRequest is used for CreateBlob, a client-streaming method.
+// The first message should contain metadata, and the subsequent messages
+// should contain content.
+message CreateBlobRequest {
+  oneof request {
+    // metadata is the metadata used to initialize the blob object with.
+    BlobMetadata metadata = 1;
+
+    // content is the binary content of the blob object.
+    bytes content = 2;
+  }
+}
+
+// BlobMetadata contains necessary metadata
+// when creating (uploading) a new blob object.
+message BlobMetadata {
+  // store_key is the key of the store that the record belongs to.
+  string store_key = 1;
+
+  // record_key is the key of the record the new blob object belongs to.
+  string record_key = 2;
+
+  // size is the byte length of the object.
+  int64 size = 3;
+
+  // Performance hints (write only).
+  Hint hint = 4;
+
+  // md5 is the MD5 hash of the blob content.
+  // If supplied for uploads, the server validates the content using the hash value.
+  // For downloads, the server returns the stored hash value of the blob content.
+  // The length of the hash value is 0 (not present) or 16 (present) bytes.
+  bytes md5 = 5;
+
+  // crc32c is the CRC32C checksum of the blob content.
+  // Specifically, it uses the Castagnoli polynomial. https://pkg.go.dev/hash/crc32#pkg-constants
+  // If supplied for uploads, the server validates the content using the checksum.
+  // For downloads, the server returns the checksum of the blob content.
+  // Open Saves provides both MD5 and CRC32C because CRC32C is often used by
+  // Cloud object storage services.
+  uint32 crc32c = 6;
+
+  // has_crc32c indicates if crc32c is present.
+  bool has_crc32c = 7;
+
+  // chunked is set true if the attached blob is chunked, otherwise false (read only).
+  bool chunked = 8;
+
+  // Number of chunks (read only).
+  int64 chunk_count = 9;
+}
+
+message CreateChunkedBlobRequest {
+  // store_key is the key of the store that the record belongs to.
+  string store_key = 1;
+
+  // record_key is the key of the record the new blob object belongs to.
+  string record_key = 2;
+
+  // Size of each chunk
+  int64 chunk_size = 3;
+
+  // Expected number of chunks.
+  // When set to non-zero, the server checks if it has received the exact number of
+  // chunks when CommitChunkedUpload is called.
+  int64 chunk_count = 4;
+}
+
+message CreateChunkedBlobResponse {
+  // session_id is a chunked
+  string session_id = 1;
+}
+
+message CreateChunkUrlsRequest {
+  // The key of the store that the record belongs to.
+  string store_key = 1;
+
+  // The key of the record to get.
+  string key = 2;
+
+  // TTL
+  int64 ttl_in_seconds = 3;
+}
+
+message CreateChunkUrlsResponse {
+  // Public signed URLs of the chunk objects uploaded against the record ordered according to chunk number
+  repeated string chunk_urls = 1;
+}
+
+// UploadChunkRequest is used by UploadChunk, which is a client-streaming
+// method. The first message should contain the metadata, and the subsequent
+// messages should contain the content field until EOF.
+message UploadChunkRequest {
+  oneof request {
+    // metadata is the metadata to associate the chunk to.
+    ChunkMetadata metadata = 1;
+
+    // content is the binary content of the chunk.
+    bytes content = 2;
+  }
+}
+
+message ChunkMetadata {
+  // session_id is the ID of a chunk upload session. Not used for downloads.
+  string session_id = 1;
+
+  // number is the number of the chunk.
+  int64 number = 2;
+
+  // size is a byte size of the chunk.
+  int64 size = 3;
+
+  // Performance hints (write only).
+  Hint hint = 4;
+
+  // md5 is the MD5 hash of the chunk content.
+  // If supplied for uploads, the server validates the content using the hash value.
+  // For downloads, the server returns the stored hash value of the chunk content.
+  // The length of the hash value is 0 (not present) or 16 (present) bytes.
+  bytes md5 = 5;
+
+  // crc32c is the CRC32C checksum of the chunk content.
+  // Specifically, it uses the Castagnoli polynomial. https://pkg.go.dev/hash/crc32#pkg-constants
+  // If supplied for uploads, the server validates the content using the checksum.
+  // For downloads, the server returns the checksum of the chunk content.
+  // Open Saves provides both MD5 and CRC32C because CRC32C is often used by
+  // Cloud object storage services.
+  uint32 crc32c = 6;
+
+  // has_crc32c indicates if crc32c is present.
+  bool has_crc32c = 7;
+}
+
+message CommitChunkedUploadRequest {
+  // session_id is the ID of a chunked upload session to commit.
+  string session_id = 1;
+
+  // Performance hints.
+  Hint hint = 2;
+
+  // Optional record object to update during the commit operation
+  Record record = 4;
+}
+
+message AbortChunkedUploadRequest {
+  // session_id is the ID of a chunked upload session to abort.
+  string session_id = 1;
+}
+
+message GetBlobRequest {
+  // The key of the store that the record belongs to.
+  string store_key = 1;
+
+  // The key of the record to get.
+  string record_key = 2;
+
+  // Performance hints.
+  Hint hint = 3;
+}
+
+// GetBlobResponse is a server-streaming response to return metadata and
+// content of a blob object. The first message contains metadata and the
+// subsequent messages contain the rest of the binary blob in the content
+// field.
+message GetBlobResponse {
+  oneof response {
+    // metadata is the metadata used to initialize the blob object with.
+    BlobMetadata metadata = 1;
+
+    // content is the binary content of the blob object.
+    bytes content = 2;
+  }
+}
+
+message GetBlobChunkRequest {
+  // The key of the store that the record belongs to.
+  string store_key = 1;
+
+  // The key of the record to get.
+  string record_key = 2;
+
+  // chunk_number is the number of the chunk to get.
+  int64 chunk_number = 3;
+
+  // Performance hints.
+  Hint hint = 4;
+}
+
+// GetBlobChunkResponse is a server-streaming response to return metadata and
+// content of a chunked blob object. The first message contains metadata and the
+// subsequent messages contain the binary data of the chunk inthe content field.
+message GetBlobChunkResponse {
+  oneof response {
+    ChunkMetadata metadata = 1;
+    bytes content = 2;
+  }
+}
+
+message DeleteBlobRequest {
+  // The key of the store that the record belongs to.
+  string store_key = 1;
+
+  // The key of the record to delete a blob from.
+  string record_key = 2;
+
+  // Performance hints.
+  Hint hint = 3;
+}
+
+
+message PingRequest {
+  // An optional string to send with the ping message.
+  string ping = 1;
+}
+
+message PingResponse {
+  // An optional string that is copied from PingRequest.
+  string pong = 1;
+}
+
+// CompareAndSwapRequest is used by the CompareAndSwap methods to atomically update a property value.
+message CompareAndSwapRequest {
+  // The key of the store that the record belongs to.
+  string store_key = 1;
+
+  // The key of the record that the property belongs to.
+  string record_key = 2;
+
+  // The name of the integer property to perform the operation to.
+  string property_name = 3;
+
+  // value is the new property value to set.
+  Property value = 4;
+
+  // old_value is compared against the current property value.
+  Property old_value = 5;
+
+  // Performance hints.
+  Hint hint = 6;
+}
+
+// CompareAndSwapResponse is returned by CompareAndSwap and indicates whether the request
+// has updated the property value.
+message CompareAndSwapResponse {
+  // updated indicates that the condition is satisfied and the property has been updated.
+  bool updated = 1;
+
+  // value is the old value of the property.
+  Property value = 2;
+}
+
+// AtomicIntRequest is used by atomic arithmetic methods (CompareAndSwap{Greater,Less}Int,
+// Atomic{Add,Sub}Int).
+message AtomicIntRequest {
+  // The key of the store that the record belongs to.
+  string store_key = 1;
+
+  // The key of the record that the property belongs to.
+  string record_key = 2;
+
+  // The name of the integer property to perform the operation to.
+  string property_name = 3;
+
+  // value is the operand for each method (see method descriptions).
+  int64 value = 4;
+
+  // Performance hints.
+  Hint hint = 5;
+}
+
+// AtomicIntResponse indicates whether an atomic operation has updated a property
+// and includes the old value of the property.
+message AtomicIntResponse {
+  // updated indicates that the condition is satisfied and the property has been updated.
+  bool updated = 1;
+
+  // value is the property value before the atomic operation.
+  int64 value = 2;
+}
+
+// AtomicIncRequest is used by atomic increment/decrement methods.
+message AtomicIncRequest {
+  // The key of the store that the record belongs to.
+  string store_key = 1;
+
+  // The key of the record that the property belongs to.
+  string record_key = 2;
+
+  // The name of the integer property to perform the operation to.
+  string property_name = 3;
+
+  // lower_bound is the lower bound of the interval.
+  int64 lower_bound = 4;
+
+  // upper_bound is the upper bound of the interval.
+  int64 upper_bound = 5;
+
+  // Performance hints.
+  Hint hint = 6;
+}
