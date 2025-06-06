@@ -1,4 +1,6 @@
-FROM --platform=linux/amd64 golang:1.20-alpine AS builder
+FROM golang:1.20-alpine AS builder
+
+ARG TARGETARCH=amd64
 
 WORKDIR /app
 
@@ -13,11 +15,11 @@ RUN go mod download
 # Copy the source code
 COPY . .
 
-# Build the application specifically for AMD64
-RUN GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o open-saves-aws .
+# Build the application for the target architecture
+RUN GOOS=linux GOARCH=${TARGETARCH} CGO_ENABLED=0 go build -o open-saves-aws .
 
 # Create a minimal production image
-FROM --platform=linux/amd64 alpine:3.15
+FROM alpine:3.15
 
 WORKDIR /app
 

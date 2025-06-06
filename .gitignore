@@ -11,6 +11,8 @@ go.work
 # Binaries for programs and plugins
 /bin/
 /migration-tool
+open-saves-aws
+open-saves-aws-*
 
 # Output of the go coverage tool
 *.coverprofile
