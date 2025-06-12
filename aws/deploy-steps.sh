@@ -12,13 +12,19 @@ echo -e "${YELLOW}This script allows deploying Open Saves for AWS in discrete st
 
 # Set variables
 AWS_REGION="us-west-2"
-ECR_REPO_NAME="open-saves"
+ECR_REPO_NAME="dev-open-saves"  # Updated to match the actual repository name
 CLUSTER_NAME="open-saves-cluster-new"
 NAMESPACE="open-saves"
 S3_BUCKET="open-saves-blobs-$(aws sts get-caller-identity --query Account --output text)"
 REDIS_CLUSTER="open-saves-cache"
 ECR_REPO_URI=""
 ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+
+# Load environment variables if they exist
+if [ -f .env.deploy ]; then
+  source .env.deploy
+  echo -e "${GREEN}Loaded environment variables from .env.deploy${NC}"
+fi
 
 # Check for required tools
 echo -e "${YELLOW}Checking for required tools...${NC}"
@@ -54,6 +60,10 @@ create_eks_cluster_and_ecr() {
   # Get ECR repository URI
   ECR_REPO_URI=$(aws ecr describe-repositories --repository-names $ECR_REPO_NAME --query 'repositories[0].repositoryUri' --output text --region $AWS_REGION)
   echo -e "${GREEN}ECR repository URI: ${ECR_REPO_URI}${NC}"
+  
+  # Store ECR repository URI in a file for use between steps
+  echo "ECR_REPO_URI=$ECR_REPO_URI" > .env.deploy
+  echo -e "${GREEN}Stored ECR repository URI in .env.deploy file${NC}"
   
   # Create EKS cluster
   echo -e "${YELLOW}Checking if EKS cluster exists...${NC}"
@@ -259,6 +269,22 @@ build_and_push_image() {
   local arch=$1
   echo -e "${YELLOW}Step 3: Building and pushing Docker image for ${arch} architecture${NC}"
   
+  # Load ECR repository URI from file
+  if [ -f .env.deploy ]; then
+    source .env.deploy
+    echo -e "${GREEN}Loaded ECR repository URI: ${ECR_REPO_URI}${NC}"
+  else
+    # Fallback if file doesn't exist
+    ECR_REPO_URI=$(aws ecr describe-repositories --repository-names $ECR_REPO_NAME --query 'repositories[0].repositoryUri' --output text --region $AWS_REGION)
+    echo -e "${YELLOW}ECR repository URI not found in file, fetched from AWS: ${ECR_REPO_URI}${NC}"
+  fi
+  
+  # Verify that the ECR repository URI is valid
+  if [ -z "$ECR_REPO_URI" ]; then
+    echo -e "${RED}Error: ECR repository URI is empty. Cannot continue with build and push.${NC}"
+    exit 1
+  fi
+  
   # Step 1: Build the application
   echo -e "${YELLOW}Building Open Saves AWS adapter for ${arch}...${NC}"
   cd "$(dirname "$0")"
@@ -285,10 +311,6 @@ build_and_push_image() {
   fi
   echo -e "${GREEN}Docker image built successfully.${NC}"
 
-  # Get ECR repository URI
-  ECR_REPO_URI=$(aws ecr describe-repositories --repository-names $ECR_REPO_NAME --query 'repositories[0].repositoryUri' --output text --region $AWS_REGION)
-  echo -e "${GREEN}ECR repository URI: ${ECR_REPO_URI}${NC}"
-
   # Step 3: Push Docker image to ECR
   echo -e "${YELLOW}Pushing Docker image to ECR...${NC}"
   aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $ECR_REPO_URI
@@ -303,6 +325,17 @@ build_and_push_image() {
   docker push $ECR_REPO_URI:$arch
   echo -e "${GREEN}Docker image pushed to ECR.${NC}"
   
+  # Update config.yaml with ECR repository URI
+  echo -e "${YELLOW}Updating config.yaml with ECR repository URI...${NC}"
+  if grep -q "ecr:" config/config.yaml; then
+    # Update existing entry
+    sed -i "s|repository_uri: .*|repository_uri: \"$ECR_REPO_URI\"|" config/config.yaml
+  else
+    # Add new entry
+    sed -i "/elasticache:/a\\  ecr:\\n    repository_uri: \"$ECR_REPO_URI\"" config/config.yaml
+  fi
+  echo -e "${GREEN}Updated config.yaml with ECR repository URI${NC}"
+  
   echo -e "${GREEN}Step 3 completed successfully!${NC}"
 }
 
@@ -310,6 +343,31 @@ build_and_push_image() {
 deploy_compute_and_app() {
   local arch=$1
   echo -e "${YELLOW}Step 4: Deploying compute nodes and application for ${arch} architecture${NC}"
+  
+  # Load ECR repository URI from file
+  if [ -f .env.deploy ]; then
+    source .env.deploy
+    echo -e "${GREEN}Loaded ECR repository URI: ${ECR_REPO_URI}${NC}"
+  else
+    # Fallback if file doesn't exist
+    ECR_REPO_URI=$(aws ecr describe-repositories --repository-names $ECR_REPO_NAME --query 'repositories[0].repositoryUri' --output text --region $AWS_REGION)
+    echo -e "${YELLOW}ECR repository URI not found in file, fetched from AWS: ${ECR_REPO_URI}${NC}"
+  fi
+  
+  # Verify that the ECR repository URI is valid
+  if [ -z "$ECR_REPO_URI" ]; then
+    echo -e "${RED}Error: ECR repository URI is empty. Cannot continue with deployment.${NC}"
+    exit 1
+  fi
+  
+  # Verify that the image exists in ECR
+  echo -e "${YELLOW}Verifying image exists in ECR...${NC}"
+  if ! aws ecr describe-images --repository-name $ECR_REPO_NAME --image-ids imageTag=$arch --region $AWS_REGION &> /dev/null; then
+    echo -e "${RED}Error: Image with tag '${arch}' not found in ECR repository '${ECR_REPO_NAME}'.${NC}"
+    echo -e "${RED}Please build and push the image first using Step 3.${NC}"
+    exit 1
+  fi
+  echo -e "${GREEN}Image verification successful.${NC}"
   
   # Create node group for the specified architecture
   echo -e "${YELLOW}Creating node group for ${arch} architecture...${NC}"
