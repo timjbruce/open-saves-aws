@@ -2,7 +2,9 @@
 
 This file contains the list of items that still need to be accomplished to complete the migration for Open Saves to AWS. This file will be used, section by section, to accomplish the tasks. A single section must be acknowledged by a human as being completed before the next can start, denoted by the text "Completed" next to the L2 Header. When a section is ready for testing, it should be marked as "Ready to Test" on the L2 Header.
 
-As steps are complete, add the text " - Ready" at the end of each line. If an error occurs, add the text " - Error" at the end of that line and stop processing.
+As steps are complete, add the text " - Ready to Test" at the end of each line. If an error occurs, add the text " - Error" at the end of that line and stop processing.
+
+If the line is marked as " - Complete," do not take any action against that item nor adjust anything that might impact that item.
 
 Ensure the proper git branch is used. Only push code when the section or step is marked as "Ready for Validation".
 

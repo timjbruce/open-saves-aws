@@ -1,7 +1,5 @@
 FROM golang:1.20-alpine AS builder
 
-ARG TARGETARCH=amd64
-
 WORKDIR /app
 
 # Install build dependencies
@@ -15,8 +13,8 @@ RUN go mod download
 # Copy the source code
 COPY . .
 
-# Build the application for the target architecture
-RUN GOOS=linux GOARCH=${TARGETARCH} CGO_ENABLED=0 go build -o open-saves-aws .
+# Build the application for AMD64 architecture
+RUN GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o open-saves-aws .
 
 # Create a minimal production image
 FROM alpine:3.15
@@ -42,5 +40,4 @@ COPY config/config.yaml /etc/open-saves/config.yaml
 EXPOSE 8080 8081
 
 # Set the entry point
-ENTRYPOINT ["/app/open-saves-aws"]
-CMD ["--config", "/etc/open-saves/config.yaml"]
+CMD ["/app/open-saves-aws"]

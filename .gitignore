@@ -62,3 +62,4 @@ logs/
 /deploy/artifacts/
 config/config.yaml
 aws/config/config.yaml
+.env.deploy
