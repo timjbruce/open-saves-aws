@@ -215,7 +215,25 @@ resource "kubernetes_config_map" "open_saves" {
   }
 
   data = {
-    "config.yaml" = file(var.config_yaml_path)
+    "config.yaml" = <<-EOT
+server:
+  http_port: 8080
+  grpc_port: 8081
+
+aws:
+  region: "${var.region}"
+  dynamodb:
+    stores_table: "${var.dynamodb_table_names.stores}"
+    records_table: "${var.dynamodb_table_names.records}"
+    metadata_table: "${var.dynamodb_table_names.metadata}"
+  s3:
+    bucket_name: "${var.s3_bucket_name}"
+  elasticache:
+    address: "${var.redis_endpoint}"
+    ttl: 3600
+  ecr:
+    repository_uri: "${var.ecr_repo_uri}"
+EOT
   }
 }
 

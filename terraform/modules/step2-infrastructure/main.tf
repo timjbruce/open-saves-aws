@@ -98,7 +98,7 @@ resource "aws_elasticache_cluster" "redis" {
   node_type            = var.architecture == "arm64" ? "cache.t4g.small" : "cache.t3.small"
   num_cache_nodes      = 1
   parameter_group_name = "default.redis7"
-  engine_version       = "7.1.0"
+  engine_version       = "7.0"
   port                 = 6379
   subnet_group_name    = aws_elasticache_subnet_group.redis.name
   security_group_ids   = [aws_security_group.redis.id]

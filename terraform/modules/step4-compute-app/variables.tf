@@ -60,13 +60,27 @@ variable "dynamodb_table_arns" {
   type        = list(string)
 }
 
+variable "dynamodb_table_names" {
+  description = "Names of the DynamoDB tables"
+  type = object({
+    stores   = string
+    records  = string
+    metadata = string
+  })
+}
+
 variable "s3_bucket_arn" {
   description = "ARN of the S3 bucket"
   type        = string
 }
 
-variable "config_yaml_path" {
-  description = "Path to the config.yaml file"
+variable "s3_bucket_name" {
+  description = "Name of the S3 bucket"
+  type        = string
+}
+
+variable "redis_endpoint" {
+  description = "Endpoint of the ElastiCache Redis cluster"
   type        = string
 }
 
