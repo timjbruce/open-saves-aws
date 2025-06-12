@@ -13,7 +13,7 @@ Open Saves AWS uses the following AWS services:
 
 ## Deployment
 
-Open Saves AWS supports both AMD64 (x86_64) and ARM64 (Graviton) architectures. The deployment is split into discrete steps to allow for better control and troubleshooting.
+Open Saves AWS supports both AMD64 (x86_64) and ARM64 (Graviton) architectures. The deployment can be done using either bash scripts or Terraform.
 
 ### Prerequisites
 
@@ -23,10 +23,13 @@ Before deploying, ensure you have the following tools installed:
 - eksctl
 - Docker
 - Go (version 1.20 or later)
+- Terraform (version 1.0 or later, for Terraform deployment only)
+
+## Script-Based Deployment
+
+The deployment process is split into discrete steps to allow for better control and troubleshooting.
 
 ### Deployment Steps
-
-The deployment process is split into the following steps:
 
 #### Step 1: Deploy VPC, EKS cluster, and ECR registry
 
@@ -103,6 +106,60 @@ cd aws
 # Select options 1-6 in sequence, or option 7 to tear down everything at once
 ```
 
+## Terraform Deployment
+
+Open Saves AWS can also be deployed using Terraform. The deployment is split into modules that correspond to the same steps as the script-based deployment.
+
+### Deployment Steps
+
+1. Initialize Terraform:
+
+```bash
+cd terraform
+terraform init
+```
+
+2. Configure deployment variables:
+
+Edit `environments/dev/terraform.tfvars` to set your desired configuration:
+
+```hcl
+region        = "us-west-2"
+cluster_name  = "open-saves-cluster-new"
+ecr_repo_name = "dev-open-saves"
+architecture  = "amd64"  # Options: amd64, arm64, both
+```
+
+3. Deploy the infrastructure:
+
+```bash
+cd terraform
+terraform apply -var-file=environments/dev/terraform.tfvars
+```
+
+This will deploy all components in sequence:
+- EKS cluster and ECR repository
+- DynamoDB tables, S3 bucket, and ElastiCache Redis
+- Build and push container images
+- Deploy compute nodes and application
+
+4. Access the application:
+
+After deployment completes, you can access the application using the load balancer hostname:
+
+```bash
+echo $(terraform output -raw load_balancer_hostname)
+```
+
+### Teardown
+
+To tear down the environment:
+
+```bash
+cd terraform
+terraform destroy -var-file=environments/dev/terraform.tfvars
+```
+
 ## Architecture Differences
 
 ### AMD64 (x86_64)
@@ -115,7 +172,7 @@ cd aws
 
 ## Configuration
 
-The configuration for Open Saves is stored in `aws/config/config.yaml`. This file is automatically updated during deployment with the correct endpoints and resource names.
+The configuration for Open Saves is stored in `aws/config/config.yaml` (for script-based deployment) or `terraform/config/config.yaml` (for Terraform deployment). This file is automatically updated during deployment with the correct endpoints and resource names.
 
 ## Troubleshooting
 

@@ -16,8 +16,8 @@ arm64_conversion
 
 ### Steps for ARM Conversion
 1. Split up the deployment into discreet steps. Each step should have it's own script file. The architecture parameter should be the same for all files. - Ready
-  1. Deploy VPC, EKS cluster, and ECR registry. No compute nodes are needed at this point. - Ready
-  2. Deploy S3 bucket, DynamoDB tables, and ElastiCache Redis.  The Redis instance should be selected based on the architecture of choice. - Ready
+  1. Deploy VPC, EKS cluster, and ECR registry. No compute nodes are needed at this point. - Complete
+  2. Deploy S3 bucket, DynamoDB tables, and ElastiCache Redis.  The Redis instance should be selected based on the architecture of choice. - Complete
   3. Build and push the container to the ECR registry, following the architecture of choice. - Ready
   4. Deploy nodes, node groups, roles, and policies for appropriate architecture of choice. Schedule the pods for the container image pushed in step 3. - Ready
   5. Run a full test of the enviornment. - Ready
@@ -34,11 +34,15 @@ arm64_conversion
 3. Steps should be easy to figure out for the user. - Ready
 4. README.md should be updated with the deployment steps - Ready
 
-## Terraform Deploy
-Instead of using scripts to deploy resources, different Terraform scripts. Use the same steps as identified in teh ARM Conversion section.
+## Terraform Deploy - Completed
+Instead of using scripts to deploy resources, different Terraform scripts. Use the same steps as identified in the ARM Conversion section.
 
-1. Convert script to different Terraform deployment modules
-2. Update the README.md file with the updated deployment process
+1. Convert script to different Terraform deployment modules - Ready
+2. Update the README.md file with the updated deployment process - Ready
+3. Terraform modules should be setup in a /terraform directory - Ready
+
+### git branch
+arm64_conversion
 
 ### Bugs to fix
 none at this time
