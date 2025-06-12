@@ -12,15 +12,6 @@ provider "kubernetes" {
   }
 }
 
-# Get configuration from Parameter Store
-data "aws_ssm_parameter" "config" {
-  name = var.parameter_store_name
-}
-
-locals {
-  config = jsondecode(data.aws_ssm_parameter.config.value)
-}
-
 # EKS Node Group
 resource "aws_eks_node_group" "nodes" {
   cluster_name    = var.cluster_name
