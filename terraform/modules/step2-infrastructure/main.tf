@@ -104,7 +104,38 @@ resource "aws_elasticache_cluster" "redis" {
   security_group_ids   = [aws_security_group.redis.id]
 }
 
-# Create config.yaml template
+# Create config in Parameter Store
+resource "aws_ssm_parameter" "config" {
+  name        = "/open-saves/${var.environment}/config"
+  description = "Configuration for Open Saves"
+  type        = "String"
+  value       = jsonencode({
+    server = {
+      http_port = 8080
+      grpc_port = 8081
+    }
+    aws = {
+      region = var.region
+      dynamodb = {
+        stores_table   = aws_dynamodb_table.stores.name
+        records_table  = aws_dynamodb_table.records.name
+        metadata_table = aws_dynamodb_table.metadata.name
+      }
+      s3 = {
+        bucket_name = aws_s3_bucket.blobs.bucket
+      }
+      elasticache = {
+        address = "${aws_elasticache_cluster.redis.cache_nodes.0.address}:${aws_elasticache_cluster.redis.cache_nodes.0.port}"
+        ttl     = 3600
+      }
+      ecr = {
+        repository_uri = var.ecr_repo_uri
+      }
+    }
+  })
+}
+
+# Create config.yaml file for backward compatibility
 resource "local_file" "config_yaml" {
   content = <<-EOT
 server:

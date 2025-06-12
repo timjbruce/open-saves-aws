@@ -69,3 +69,9 @@ variable "config_yaml_path" {
   description = "Path to the config.yaml file"
   type        = string
 }
+
+variable "parameter_store_name" {
+  description = "Name of the Parameter Store parameter containing the configuration"
+  type        = string
+  default     = "/open-saves/dev/config"
+}

@@ -35,3 +35,8 @@ output "redis_security_group_id" {
   description = "ID of the Redis security group"
   value       = aws_security_group.redis.id
 }
+
+output "parameter_store_name" {
+  description = "Name of the Parameter Store parameter containing the configuration"
+  value       = aws_ssm_parameter.config.name
+}

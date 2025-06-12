@@ -34,3 +34,9 @@ variable "config_path" {
   type        = string
   default     = "../config"
 }
+
+variable "environment" {
+  description = "Environment name (e.g., dev, prod)"
+  type        = string
+  default     = "dev"
+}

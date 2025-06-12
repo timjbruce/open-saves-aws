@@ -40,6 +40,8 @@ Instead of using scripts to deploy resources, different Terraform scripts. Use t
 1. Convert script to different Terraform deployment modules - Ready
 2. Update the README.md file with the updated deployment process - Ready
 3. Terraform modules should be setup in a /terraform directory - Ready
+4. Update step 2 to use Parameter Store instead of a local yaml file - Ready
+5. Update any steps that needed the local yaml file input to use parameter store - Ready
 
 ### git branch
 arm64_conversion

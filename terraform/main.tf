@@ -19,6 +19,7 @@ module "step2_infrastructure" {
   private_subnet_ids = module.step1_cluster_ecr.private_subnet_ids
   ecr_repo_uri     = module.step1_cluster_ecr.ecr_repo_uri
   config_path      = "${path.module}/config"
+  environment      = var.environment
   
   depends_on = [module.step1_cluster_ecr]
 }
@@ -51,6 +52,7 @@ module "step4_compute_app" {
   dynamodb_table_arns = module.step2_infrastructure.dynamodb_table_arns
   s3_bucket_arn     = module.step2_infrastructure.s3_bucket_arn
   config_yaml_path  = "${path.module}/config/config.yaml"
+  parameter_store_name = module.step2_infrastructure.parameter_store_name
   
   depends_on = [module.step3_container_images]
 }

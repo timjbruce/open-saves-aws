@@ -12,6 +12,15 @@ provider "kubernetes" {
   }
 }
 
+# Get configuration from Parameter Store
+data "aws_ssm_parameter" "config" {
+  name = var.parameter_store_name
+}
+
+locals {
+  config = jsondecode(data.aws_ssm_parameter.config.value)
+}
+
 # EKS Node Group
 resource "aws_eks_node_group" "nodes" {
   cluster_name    = var.cluster_name
@@ -70,6 +79,26 @@ resource "aws_iam_role_policy_attachment" "node_AmazonEKS_CNI_Policy" {
 resource "aws_iam_role_policy_attachment" "node_AmazonEC2ContainerRegistryReadOnly" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonEC2ContainerRegistryReadOnly"
   role       = aws_iam_role.node_role.name
+}
+
+# Add SSM Parameter Store read access
+resource "aws_iam_role_policy" "node_ssm_policy" {
+  name = "open-saves-ssm-policy-${var.architecture}"
+  role = aws_iam_role.node_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = [
+          "ssm:GetParameter",
+          "ssm:GetParameters"
+        ]
+        Effect   = "Allow"
+        Resource = "arn:aws:ssm:${var.region}:*:parameter/open-saves/*"
+      }
+    ]
+  })
 }
 
 # IAM Role for Service Account
@@ -143,6 +172,25 @@ resource "aws_iam_role_policy" "s3_policy" {
   })
 }
 
+resource "aws_iam_role_policy" "ssm_policy" {
+  name = "open-saves-ssm-policy-${var.architecture}"
+  role = aws_iam_role.service_account_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = [
+          "ssm:GetParameter",
+          "ssm:GetParameters"
+        ]
+        Effect   = "Allow"
+        Resource = "arn:aws:ssm:${var.region}:*:parameter/open-saves/*"
+      }
+    ]
+  })
+}
+
 # Kubernetes Resources
 resource "kubernetes_namespace" "open_saves" {
   metadata {
@@ -205,7 +253,7 @@ resource "kubernetes_deployment" "open_saves" {
           image = "${var.ecr_repo_uri}:${var.architecture}"
           
           command = ["/app/open-saves-aws"]
-          args    = ["--config", "/etc/open-saves/config.yaml"]
+          args    = ["--config", "/etc/open-saves/config.yaml", "--param-store", var.parameter_store_name]
           
           resources {
             limits = {

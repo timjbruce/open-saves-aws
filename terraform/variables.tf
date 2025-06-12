@@ -38,3 +38,9 @@ variable "source_hash" {
   type        = string
   default     = "initial"
 }
+
+variable "environment" {
+  description = "Environment name (e.g., dev, prod)"
+  type        = string
+  default     = "dev"
+}
