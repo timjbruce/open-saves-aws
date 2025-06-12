@@ -20,8 +20,6 @@ module "step2_infrastructure" {
   ecr_repo_uri     = module.step1_cluster_ecr.ecr_repo_uri
   config_path      = "${path.module}/config"
   environment      = var.environment
-  
-  depends_on = [module.step1_cluster_ecr]
 }
 
 module "step3_container_images" {
@@ -32,8 +30,6 @@ module "step3_container_images" {
   ecr_repo_uri = module.step1_cluster_ecr.ecr_repo_uri
   source_path  = "${path.module}/../aws"
   source_hash  = var.source_hash
-  
-  depends_on = [module.step2_infrastructure]
 }
 
 module "step4_compute_app" {
@@ -53,6 +49,4 @@ module "step4_compute_app" {
   s3_bucket_arn     = module.step2_infrastructure.s3_bucket_arn
   config_yaml_path  = "${path.module}/config/config.yaml"
   parameter_store_name = module.step2_infrastructure.parameter_store_name
-  
-  depends_on = [module.step3_container_images]
 }
