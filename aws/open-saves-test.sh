@@ -8,14 +8,21 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
+# Find and load configuration
+if [ -f "../config/config.json" ]; then
+  CONFIG_FILE="../config/config.json"
+elif [ -f "config/config.json" ]; then
+  CONFIG_FILE="config/config.json"
+else
+  echo -e "${RED}Error: config.json not found${NC}"
+  exit 1
+fi
+
+echo -e "${YELLOW}Using configuration from: ${CONFIG_FILE}${NC}"
+
 # Detect architecture or use the provided one
 if [ -z "$ARCH" ]; then
-  ARCH=$(uname -m)
-  if [ "$ARCH" == "aarch64" ] || [ "$ARCH" == "arm64" ]; then
-    ARCH="arm64"
-  else
-    ARCH="amd64"
-  fi
+  ARCH="arm64"
 fi
 echo -e "${YELLOW}Using architecture: ${ARCH}${NC}"
 
@@ -68,7 +75,8 @@ kubectl wait --for=condition=Ready pod/redis-test-$ARCH -n open-saves --timeout=
 
 # Get Redis endpoint from config
 echo -e "${YELLOW}Getting Redis endpoint from config...${NC}"
-REDIS_ENDPOINT="open-saves-cache.trfifg.0001.usw2.cache.amazonaws.com"
+# Extract Redis endpoint from config.json
+REDIS_ENDPOINT=$(grep -o '"address": "[^"]*' $CONFIG_FILE | cut -d'"' -f4 | cut -d':' -f1)
 echo -e "${YELLOW}Redis endpoint: ${REDIS_ENDPOINT}:6379${NC}"
 
 # Test Redis connectivity
@@ -313,9 +321,11 @@ echo -e "\n${YELLOW}Uploading multiple blobs...${NC}"
 echo "Uploading blob 1..."
 blob1_content="This is blob 1 content"
 echo "Blob 1 content: ${blob1_content}"
-blob1_response=$(curl -s -X PUT -H "Content-Type: application/octet-stream" --data-binary "${blob1_content}" \
-  ${SERVICE_URL}/api/stores/${store_id}/records/${blob_record}/blobs/blob1)
+echo "Upload URL: ${SERVICE_URL}/api/stores/${store_id}/records/${blob_record}/blobs/blob1"
+blob1_response=$(curl -v -X PUT -H "Content-Type: application/octet-stream" --data-binary "${blob1_content}" \
+  ${SERVICE_URL}/api/stores/${store_id}/records/${blob_record}/blobs/blob1 2>&1)
 blob1_status=$?
+echo "Blob 1 upload response: ${blob1_response}"
 if [ $blob1_status -eq 0 ]; then
   test_result 0 "Upload blob 1 (Status: 200)"
 else
@@ -325,9 +335,11 @@ fi
 echo "Uploading blob 2..."
 blob2_content="This is blob 2 content"
 echo "Blob 2 content: ${blob2_content}"
-blob2_response=$(curl -s -X PUT -H "Content-Type: application/octet-stream" --data-binary "${blob2_content}" \
-  ${SERVICE_URL}/api/stores/${store_id}/records/${blob_record}/blobs/blob2)
+echo "Upload URL: ${SERVICE_URL}/api/stores/${store_id}/records/${blob_record}/blobs/blob2"
+blob2_response=$(curl -v -X PUT -H "Content-Type: application/octet-stream" --data-binary "${blob2_content}" \
+  ${SERVICE_URL}/api/stores/${store_id}/records/${blob_record}/blobs/blob2 2>&1)
 blob2_status=$?
+echo "Blob 2 upload response: ${blob2_response}"
 if [ $blob2_status -eq 0 ]; then
   test_result 0 "Upload blob 2 (Status: 200)"
 else
@@ -335,10 +347,16 @@ else
 fi
 
 echo -e "\n${YELLOW}Checking S3 for blob storage:${NC}"
-aws s3 ls s3://open-saves-blobs-992265960412/${store_id}/${blob_record}/ --region us-west-2
+# Extract S3 bucket name from config.json
+S3_BUCKET=$(grep -o '"bucket_name": "[^"]*' $CONFIG_FILE | cut -d'"' -f4)
+echo -e "${YELLOW}Using S3 bucket: ${S3_BUCKET}${NC}"
+echo -e "${YELLOW}Looking for path: s3://${S3_BUCKET}/${store_id}/${blob_record}/${NC}"
+aws s3 ls s3://${S3_BUCKET}/${store_id}/${blob_record}/ --region us-west-2 || echo -e "${RED}No objects found in S3 path${NC}"
 
 echo -e "\n${YELLOW}Listing blobs for the record...${NC}"
+echo -e "${YELLOW}API URL: ${SERVICE_URL}/api/stores/${store_id}/records/${blob_record}/blobs${NC}"
 blobs=$(curl -s ${SERVICE_URL}/api/stores/${store_id}/records/${blob_record}/blobs)
+echo -e "${YELLOW}API Response: ${blobs}${NC}"
 if [[ $blobs == *"blob1"* ]]; then
   test_result 0 "List blobs (found blob1)"
 else

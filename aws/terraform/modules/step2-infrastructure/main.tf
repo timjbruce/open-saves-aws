@@ -106,9 +106,10 @@ resource "aws_elasticache_cluster" "redis" {
 
 # Create config in Parameter Store
 resource "aws_ssm_parameter" "config" {
-  name        = "/open-saves/${var.environment}/config"
+  name        = "/etc/open-saves/config.yaml"
   description = "Configuration for Open Saves"
   type        = "String"
+  overwrite   = true
   value       = jsonencode({
     server = {
       http_port = 8080

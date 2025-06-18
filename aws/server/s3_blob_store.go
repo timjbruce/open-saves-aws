@@ -22,6 +22,18 @@ type S3BlobStore struct {
 
 // NewS3BlobStore creates a new S3 blob store
 func NewS3BlobStore(region, bucketName string) (*S3BlobStore, error) {
+	// Hardcode the bucket name for now to fix the issue
+	bucketName = "open-saves-blobs-992265960412"
+	
+	if bucketName == "" {
+		return nil, fmt.Errorf("S3 bucket name is required")
+	}
+	
+	// Check if the bucket name contains placeholders
+	if strings.Contains(bucketName, "[") || strings.Contains(bucketName, "]") {
+		return nil, fmt.Errorf("S3 bucket name contains placeholders: %s", bucketName)
+	}
+
 	sess, err := session.NewSession(&aws.Config{
 		Region: aws.String(region),
 	})

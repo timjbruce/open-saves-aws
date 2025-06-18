@@ -7,10 +7,23 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m' # No Color
 
-# Redis endpoint
-REDIS_ENDPOINT="open-saves-cache.trfifg.0001.usw2.cache.amazonaws.com"
+# Find and load configuration
+if [ -f "../config/config.json" ]; then
+  CONFIG_FILE="../config/config.json"
+elif [ -f "config/config.json" ]; then
+  CONFIG_FILE="config/config.json"
+else
+  echo -e "${RED}Error: config.json not found${NC}"
+  exit 1
+fi
+
+echo -e "${YELLOW}Using configuration from: ${CONFIG_FILE}${NC}"
+
+# Extract Redis endpoint from config.json
+REDIS_ENDPOINT=$(grep -o '"address": "[^"]*' $CONFIG_FILE | cut -d'"' -f4 | cut -d':' -f1)
 
 echo -e "${YELLOW}=== Redis Cache Check Tool ===${NC}"
+echo -e "${YELLOW}Using Redis endpoint: ${REDIS_ENDPOINT}${NC}"
 
 # Create Redis test pod if it doesn't exist
 if ! kubectl get pod -n open-saves redis-test &>/dev/null; then

@@ -30,3 +30,15 @@ variable "source_hash" {
   type        = string
   default     = "initial"
 }
+
+variable "s3_bucket_name" {
+  description = "Name of the S3 bucket for blobs"
+  type        = string
+  default     = ""
+}
+
+variable "redis_endpoint" {
+  description = "Endpoint of the ElastiCache Redis cluster"
+  type        = string
+  default     = ""
+}

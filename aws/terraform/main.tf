@@ -30,6 +30,8 @@ module "step3_container_images" {
   ecr_repo_uri = module.step1_cluster_ecr.ecr_repo_uri
   source_path  = "${path.module}/../aws"
   source_hash  = var.source_hash
+  s3_bucket_name = module.step2_infrastructure.s3_bucket_name
+  redis_endpoint = module.step2_infrastructure.redis_endpoint
 }
 
 module "step4_compute_app" {

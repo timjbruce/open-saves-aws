@@ -20,9 +20,9 @@ data:
         records_table: "open-saves-records"
         metadata_table: "open-saves-metadata"
       s3:
-        bucket_name: "open-saves-blobs-559050240678"
+        bucket_name: "open-saves-blobs-[accountnumber]"
       elasticache:
-        address: "open-saves-cache.ifdvq6.0001.usw2.cache.amazonaws.com:6379"
+        address: "[redis-endpoint]:6379"
         ttl: 3600
 ---
 apiVersion: apps/v1
@@ -42,7 +42,7 @@ spec:
     spec:
       containers:
       - name: open-saves
-        image: 559050240678.dkr.ecr.us-west-2.amazonaws.com/open-saves:latest
+        image: [accountnumber].dkr.ecr.us-west-2.amazonaws.com/open-saves:latest
         ports:
         - containerPort: 8080
           name: http

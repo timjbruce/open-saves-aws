@@ -1,183 +1,151 @@
-# Open Saves AWS Adapter
+# Open Saves AWS Implementation
 
-This is an AWS implementation of the [Open Saves](https://github.com/googleforgames/open-saves) API, providing a cloud-native storage system for game developers using AWS services.
+This is the AWS implementation of Open Saves, a cloud-based storage solution for game save data.
 
 ## Overview
 
-Open Saves AWS Adapter provides a unified, well-defined gRPC endpoint for all operations for metadata, structured, and unstructured objects, leveraging AWS services:
-
-- **DynamoDB**: For storing metadata, stores, and records
-- **S3**: For blob storage
-- **ElastiCache Redis**: For caching frequently accessed data
+Open Saves AWS uses the following AWS services:
+- Amazon EKS for container orchestration
+- Amazon DynamoDB for metadata and small record storage
+- Amazon S3 for blob storage
+- Amazon ElastiCache Redis for caching
 
 ## Architecture
 
-```
-                                                  ┌───────────────────┐
-                                                  │                   │
-                                                  │  Game Clients     │
-                                                  │                   │
-                                                  └─────────┬─────────┘
-                                                            │
-                                                            ▼
-┌─────────────────────────────────────────────────────────────────────────────────┐
-│                                                                                 │
-│                               AWS Cloud                                         │
-│                                                                                 │
-│  ┌─────────────────────┐          ┌─────────────────────┐                       │
-│  │                     │          │                     │                       │
-│  │   Load Balancer     │◄────────►│   EKS Cluster       │                       │
-│  │                     │          │                     │                       │
-│  └─────────────────────┘          └──────────┬──────────┘                       │
-│                                              │                                  │
-│                                              │                                  │
-│                                              ▼                                  │
-│  ┌─────────────────────┐          ┌─────────────────────┐                       │
-│  │                     │          │                     │                       │
-│  │   ElastiCache       │◄────────►│   Open Saves        │                       │
-│  │   Redis Cluster     │          │   Server Pods       │                       │
-│  │                     │          │                     │                       │
-│  └─────────────────────┘          └──────────┬──────────┘                       │
-│                                              │                                  │
-│                                              │                                  │
-│                                              ▼                                  │
-│  ┌─────────────────────┐          ┌─────────────────────┐    ┌─────────────────┐│
-│  │                     │          │                     │    │                 ││
-│  │   DynamoDB Tables   │◄────────►│   AWS SDK           │    │                 ││
-│  │   - Stores          │          │                     │    │                 ││
-│  │   - Records         │          │                     │    │   S3 Bucket     ││
-│  │   - Metadata        │          │                     │◄───►│   (Blobs)      ││
-│  │                     │          │                     │    │                 ││
-│  └─────────────────────┘          └─────────────────────┘    │                 ││
-│                                                              └─────────────────┘│
-│                                                                                 │
-└─────────────────────────────────────────────────────────────────────────────────┘
-```
+The Open Saves AWS implementation follows a modular architecture with the following components:
 
-## Data Flow
-
-```
-┌───────────────┐     ┌───────────────┐     ┌───────────────┐
-│               │     │               │     │               │
-│  Game Client  │────►│  Open Saves   │────►│   DynamoDB    │
-│               │     │    Server     │     │   (Metadata)  │
-└───────────────┘     └───────┬───────┘     └───────────────┘
-                              │
-                              │
-                  ┌───────────┴───────────┐
-                  │                       │
-                  ▼                       ▼
-         ┌─────────────────┐     ┌─────────────────┐
-         │                 │     │                 │
-         │  ElastiCache    │     │  S3 Bucket      │
-         │  Redis (Cache)  │     │  (Blob Storage) │
-         │                 │     │                 │
-         └─────────────────┘     └─────────────────┘
-```
-
-### Request Flow Example
-
-1. **Store/Record Access**:
-   ```
-   Client Request → Open Saves Server → Redis Cache (if available) → DynamoDB → Response
-   ```
-
-2. **Blob Storage**:
-   ```
-   Client Request → Open Saves Server → S3 Bucket → Response
-   ```
-
-3. **Cache Update**:
-   ```
-   DynamoDB Data → Open Saves Server → Redis Cache
-   ```
-
-The Open Saves AWS Adapter uses a multi-table DynamoDB approach:
-
-1. **Stores Table**: Stores metadata about stores
-2. **Records Table**: Stores record data with a composite key (store_id, record_id)
-3. **Metadata Table**: Stores system metadata
-
-Blobs are stored in S3, with keys formatted as `{store_id}/{record_id}/{blob_key}`.
-
-Redis is used for caching frequently accessed data, improving performance for repeated operations.
+1. **EKS Cluster and ECR Registry**: The foundational infrastructure including VPC, subnets, EKS cluster, and ECR repository.
+2. **Infrastructure Layer**: DynamoDB tables, S3 bucket, and ElastiCache Redis cluster.
+3. **Container Images**: Open Saves application container images stored in ECR.
+4. **Compute Layer**: EKS node groups, application pods, and services.
 
 ## Deployment
 
+The deployment is managed through Terraform and is divided into discrete steps that can be executed individually.
+
 ### Prerequisites
 
-- AWS CLI configured with appropriate permissions
-- kubectl installed
-- Docker installed
-- Go 1.20 or later installed
+- AWS CLI configured with appropriate credentials
+- Terraform installed (version 1.0.0 or later)
+- Docker installed (for building container images)
+- kubectl installed (for interacting with the Kubernetes cluster)
 
 ### Deployment Steps
 
-1. Clone this repository
-2. Run the deployment script:
+Use the `scripts/deploy-targeted.sh` script to deploy each step individually:
 
 ```bash
-./deploy-all.sh
+./scripts/deploy-targeted.sh --step <step_number> --arch <architecture>
 ```
 
-This script will:
-- Build the application
-- Create a Docker image
-- Push the image to ECR
-- Create DynamoDB tables
-- Create an S3 bucket
-- Create an EKS cluster
-- Create an ElastiCache Redis cluster
-- Deploy the application to EKS
+Where:
+- `<step_number>` is one of: 1, 2, 3, 4, or "all"
+- `<architecture>` is one of: amd64, arm64, or both
+
+#### Examples
+
+1. Deploy only the EKS cluster and ECR registry:
+   ```bash
+   ./scripts/deploy-targeted.sh --step 1 --arch amd64
+   ```
+
+2. Deploy only the infrastructure components:
+   ```bash
+   ./scripts/deploy-targeted.sh --step 2 --arch arm64
+   ```
+
+3. Build and push container images:
+   ```bash
+   ./scripts/deploy-targeted.sh --step 3 --arch both
+   ```
+
+4. Deploy compute nodes and application:
+   ```bash
+   ./scripts/deploy-targeted.sh --step 4 --arch arm64
+   ```
+
+5. Deploy all steps in sequence:
+   ```bash
+   ./scripts/deploy-targeted.sh --step all --arch amd64
+   ```
+
+### Destroying Resources
+
+To destroy resources for a specific step, use the `--destroy` flag:
+
+```bash
+./scripts/deploy-targeted.sh --step <step_number> --arch <architecture> --destroy
+```
+
+When destroying resources, it's recommended to destroy them in reverse order (4, 3, 2, 1) or use:
+
+```bash
+./scripts/deploy-targeted.sh --step all --arch <architecture> --destroy
+```
+
+Alternatively, you can use the cleanup script which will destroy all resources:
+
+```bash
+./scripts/cleanup.sh
+```
 
 ## Testing
 
-To test the deployment, run:
+After deployment, you can run tests using the provided test script:
 
 ```bash
-./open-saves-test.sh http://<service-url>
+./open-saves-test.sh http://<service-url>:8080
 ```
 
-Replace `<service-url>` with the URL of your deployed service.
+Replace `<service-url>` with the external endpoint from the service output.
 
-The test script will verify:
-- Basic functionality (health check, store operations, record operations)
-- Redis caching performance
-- Query operations
-- Update and delete operations
-- Blob operations
-- Metadata operations
+## Configuration
 
-## API Reference
+The deployment uses AWS Systems Manager Parameter Store for configuration. This provides a more secure and centralized way to manage configuration.
 
-### Stores
+The Parameter Store parameter is created during Step 2 (Infrastructure) and is used by the application pods deployed in Step 4.
 
-- `GET /api/stores`: List all stores
-- `POST /api/stores`: Create a store
-- `GET /api/stores/{store_id}`: Get a store
-- `DELETE /api/stores/{store_id}`: Delete a store
+## Verifying the Deployment
 
-### Records
+After completing Step 4, you can verify the deployment:
 
-- `GET /api/stores/{store_id}/records`: List records in a store
-- `POST /api/stores/{store_id}/records`: Create a record
-- `GET /api/stores/{store_id}/records/{record_id}`: Get a record
-- `PUT /api/stores/{store_id}/records/{record_id}`: Update a record
-- `DELETE /api/stores/{store_id}/records/{record_id}`: Delete a record
+1. Configure kubectl to use your EKS cluster:
+   ```bash
+   aws eks update-kubeconfig --name open-saves-cluster-new --region us-west-2
+   ```
 
-### Blobs
+2. Check the pods:
+   ```bash
+   kubectl get pods -n open-saves
+   ```
 
-- `GET /api/stores/{store_id}/records/{record_id}/blobs`: List blobs in a record
-- `GET /api/stores/{store_id}/records/{record_id}/blobs/{blob_key}`: Get a blob
-- `PUT /api/stores/{store_id}/records/{record_id}/blobs/{blob_key}`: Upload a blob
-- `DELETE /api/stores/{store_id}/records/{record_id}/blobs/{blob_key}`: Delete a blob
+3. Get the service URL:
+   ```bash
+   kubectl get service -n open-saves
+   ```
 
-### Metadata
+## Troubleshooting
 
-- `GET /api/metadata/{metadata_type}/{metadata_id}`: Get metadata
-- `POST /api/metadata/{metadata_type}/{metadata_id}`: Create or update metadata
-- `DELETE /api/metadata/{metadata_type}/{metadata_id}`: Delete metadata
+If you encounter issues during deployment:
+
+1. Check the Terraform state:
+   ```bash
+   cd terraform
+   terraform state list
+   ```
+
+2. Check the EKS cluster status:
+   ```bash
+   aws eks describe-cluster --name open-saves-cluster-new --region us-west-2
+   ```
+
+3. Check the logs of the pods:
+   ```bash
+   kubectl logs -n open-saves <pod-name>
+   ```
+
+4. If a step fails, you can retry just that step using the deployment script.
 
 ## License
 
-Apache 2.0
+This project is licensed under the Apache 2.0 License - see the LICENSE file for details.

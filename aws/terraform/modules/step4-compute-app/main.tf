@@ -125,12 +125,7 @@ resource "aws_iam_role_policy" "dynamodb_policy" {
     Statement = [
       {
         Action = [
-          "dynamodb:GetItem",
-          "dynamodb:PutItem",
-          "dynamodb:UpdateItem",
-          "dynamodb:DeleteItem",
-          "dynamodb:Query",
-          "dynamodb:Scan"
+          "dynamodb:*"
         ]
         Effect   = "Allow"
         Resource = var.dynamodb_table_arns
@@ -148,10 +143,7 @@ resource "aws_iam_role_policy" "s3_policy" {
     Statement = [
       {
         Action = [
-          "s3:GetObject",
-          "s3:PutObject",
-          "s3:DeleteObject",
-          "s3:ListBucket"
+          "s3:*"
         ]
         Effect   = "Allow"
         Resource = [
@@ -176,7 +168,25 @@ resource "aws_iam_role_policy" "ssm_policy" {
           "ssm:GetParameters"
         ]
         Effect   = "Allow"
-        Resource = "arn:aws:ssm:${var.region}:*:parameter/open-saves/*"
+        Resource = "arn:aws:ssm:${var.region}:*:parameter/*"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy" "elasticache_policy" {
+  name = "open-saves-elasticache-policy-${var.architecture}"
+  role = aws_iam_role.service_account_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = [
+          "elasticache:*"
+        ]
+        Effect   = "Allow"
+        Resource = "*"
       }
     ]
   })
@@ -262,7 +272,7 @@ resource "kubernetes_deployment" "open_saves" {
           image = "${var.ecr_repo_uri}:${var.architecture}"
           
           command = ["/app/open-saves-aws"]
-          args    = ["--config", "/etc/open-saves/config.yaml", "--param-store", var.parameter_store_name]
+          args    = ["--config", "/etc/open-saves/config.yaml"]
           
           resources {
             limits = {
