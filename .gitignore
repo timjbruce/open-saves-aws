@@ -11,6 +11,8 @@ go.work
 # Binaries for programs and plugins
 /bin/
 /migration-tool
+open-saves-aws
+open-saves-aws-*
 
 # Output of the go coverage tool
 *.coverprofile
@@ -58,3 +60,29 @@ logs/
 
 # Deployment artifacts
 /deploy/artifacts/
+.env.deploy
+
+# Configuration files
+config/config.yaml
+config/config.json
+aws/config/
+terraform/config/
+**/config/*.yaml
+**/config/*.json
+**/config/*.yml
+
+# Planning and documentation
+/plan/
+
+# Container images and build artifacts
+*.tar
+*.tar.gz
+*.docker
+*.img
+*.image
+aws/images/
+aws/container-images/
+**/container_images/
+**/docker-images/
+aws/open-saves-aws
+aws/open-saves-aws-arm64
