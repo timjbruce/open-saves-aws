@@ -20,6 +20,7 @@ module "step2_infrastructure" {
   ecr_repo_uri     = module.step1_cluster_ecr.ecr_repo_uri
   config_path      = "${path.module}/config"
   environment      = var.environment
+  eks_cluster_security_group_id = module.step1_cluster_ecr.cluster_security_group_id
 }
 
 module "step3_container_images" {
@@ -50,6 +51,7 @@ module "step4_compute_app" {
   dynamodb_table_arns = module.step2_infrastructure.dynamodb_table_arns
   dynamodb_table_names = module.step2_infrastructure.dynamodb_table_names
   s3_bucket_arn     = module.step2_infrastructure.s3_bucket_arn
+  s3_bucket_id      = module.step2_infrastructure.s3_bucket_id
   s3_bucket_name    = module.step2_infrastructure.s3_bucket_name
   redis_endpoint    = module.step2_infrastructure.redis_endpoint
   parameter_store_name = module.step2_infrastructure.parameter_store_name

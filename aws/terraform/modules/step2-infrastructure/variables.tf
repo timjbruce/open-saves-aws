@@ -40,3 +40,14 @@ variable "environment" {
   type        = string
   default     = "dev"
 }
+
+variable "eks_cluster_security_group_id" {
+  description = "Security group ID of the EKS cluster"
+  type        = string
+}
+
+variable "service_account_role_arn" {
+  description = "ARN of the service account role"
+  type        = string
+  default     = ""
+}

@@ -125,7 +125,13 @@ resource "aws_iam_role_policy" "dynamodb_policy" {
     Statement = [
       {
         Action = [
-          "dynamodb:*"
+          "dynamodb:GetItem",
+          "dynamodb:PutItem",
+          "dynamodb:DeleteItem",
+          "dynamodb:Query",
+          "dynamodb:Scan",
+          "dynamodb:UpdateItem",
+          "dynamodb:BatchWriteItem"
         ]
         Effect   = "Allow"
         Resource = var.dynamodb_table_arns
@@ -143,7 +149,11 @@ resource "aws_iam_role_policy" "s3_policy" {
     Statement = [
       {
         Action = [
-          "s3:*"
+          "s3:HeadObject",
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:DeleteObject",
+          "s3:ListObjectsV2"
         ]
         Effect   = "Allow"
         Resource = [
@@ -168,31 +178,54 @@ resource "aws_iam_role_policy" "ssm_policy" {
           "ssm:GetParameters"
         ]
         Effect   = "Allow"
-        Resource = "arn:aws:ssm:${var.region}:*:parameter/*"
-      }
-    ]
-  })
-}
-
-resource "aws_iam_role_policy" "elasticache_policy" {
-  name = "open-saves-elasticache-policy-${var.architecture}"
-  role = aws_iam_role.service_account_role.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Action = [
-          "elasticache:*"
-        ]
-        Effect   = "Allow"
-        Resource = "*"
+        Resource = "arn:aws:ssm:${var.region}:*:parameter/open-saves/*"
       }
     ]
   })
 }
 
 # Kubernetes Resources
+
+# Add S3 bucket policy
+resource "aws_s3_bucket_policy" "blobs" {
+  bucket = var.s3_bucket_id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect    = "Allow"
+        Principal = {
+          AWS = aws_iam_role.service_account_role.arn
+        }
+        Action = [
+          "s3:HeadObject",
+          "s3:GetObject",
+          "s3:PutObject",
+          "s3:DeleteObject",
+          "s3:ListObjectsV2"
+        ]
+        Resource = [
+          var.s3_bucket_arn,
+          "${var.s3_bucket_arn}/*"
+        ]
+      },
+      {
+        Effect    = "Deny"
+        Principal = "*"
+        Action    = "s3:*"
+        Resource = [
+          var.s3_bucket_arn,
+          "${var.s3_bucket_arn}/*"
+        ]
+        Condition = {
+          StringNotEquals = {
+            "aws:PrincipalArn" = aws_iam_role.service_account_role.arn
+          }
+        }
+      }
+    ]
+  })
+}
 resource "kubernetes_namespace" "open_saves" {
   metadata {
     name = var.namespace

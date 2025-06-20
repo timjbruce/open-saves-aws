@@ -26,6 +26,11 @@ output "s3_bucket_name" {
   value       = aws_s3_bucket.blobs.bucket
 }
 
+output "s3_bucket_id" {
+  description = "ID of the S3 bucket"
+  value       = aws_s3_bucket.blobs.id
+}
+
 output "redis_endpoint" {
   description = "Endpoint of the ElastiCache Redis cluster"
   value       = "${aws_elasticache_cluster.redis.cache_nodes.0.address}:${aws_elasticache_cluster.redis.cache_nodes.0.port}"

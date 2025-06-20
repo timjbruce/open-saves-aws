@@ -66,6 +66,30 @@ resource "aws_s3_bucket_acl" "blobs" {
   acl    = "private"
 }
 
+resource "aws_s3_bucket_server_side_encryption_configuration" "blobs" {
+  bucket = aws_s3_bucket.blobs.id
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+  }
+}
+
+resource "aws_s3_bucket_public_access_block" "blobs" {
+  bucket                  = aws_s3_bucket.blobs.id
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+resource "aws_s3_bucket_versioning" "blobs" {
+  bucket = aws_s3_bucket.blobs.id
+  versioning_configuration {
+    status = "Enabled"
+  }
+}
+
 # ElastiCache Redis
 resource "aws_elasticache_subnet_group" "redis" {
   name       = "open-saves-cache-subnet"
@@ -78,10 +102,10 @@ resource "aws_security_group" "redis" {
   vpc_id      = var.vpc_id
 
   ingress {
-    from_port   = 6379
-    to_port     = 6379
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    from_port       = 6379
+    to_port         = 6379
+    protocol        = "tcp"
+    security_groups = [var.eks_cluster_security_group_id]
   }
 
   egress {
