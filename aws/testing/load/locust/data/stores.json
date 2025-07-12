@@ -1,0 +1,27 @@
+[
+  {
+    "store_id": "player_saves",
+    "name": "Player Save Games",
+    "description": "Store for player save game data"
+  },
+  {
+    "store_id": "player_settings",
+    "name": "Player Settings",
+    "description": "Store for player settings and preferences"
+  },
+  {
+    "store_id": "game_leaderboards",
+    "name": "Game Leaderboards",
+    "description": "Store for game leaderboard data"
+  },
+  {
+    "store_id": "game_achievements",
+    "name": "Game Achievements",
+    "description": "Store for player achievement data"
+  },
+  {
+    "store_id": "game_analytics",
+    "name": "Game Analytics",
+    "description": "Store for game analytics data"
+  }
+]

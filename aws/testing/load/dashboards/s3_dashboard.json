@@ -1,0 +1,145 @@
+{
+  "widgets": [
+    {
+      "type": "metric",
+      "x": 0,
+      "y": 0,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ "AWS/S3", "AllRequests", "BucketName", "${BucketName}", "FilterId", "EntireBucket" ],
+          [ ".", "GetRequests", ".", ".", ".", "." ],
+          [ ".", "PutRequests", ".", ".", ".", "." ],
+          [ ".", "DeleteRequests", ".", ".", ".", "." ]
+        ],
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "${Region}",
+        "title": "S3 Request Count",
+        "period": 60,
+        "stat": "Sum"
+      }
+    },
+    {
+      "type": "metric",
+      "x": 12,
+      "y": 0,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ "AWS/S3", "BytesDownloaded", "BucketName", "${BucketName}", "FilterId", "EntireBucket" ],
+          [ ".", "BytesUploaded", ".", ".", ".", "." ]
+        ],
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "${Region}",
+        "title": "S3 Data Transfer",
+        "period": 60,
+        "stat": "Sum"
+      }
+    },
+    {
+      "type": "metric",
+      "x": 0,
+      "y": 6,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ "AWS/S3", "FirstByteLatency", "BucketName", "${BucketName}", "FilterId", "EntireBucket" ]
+        ],
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "${Region}",
+        "title": "S3 First Byte Latency",
+        "period": 60,
+        "stat": "Average",
+        "yAxis": {
+          "left": {
+            "min": 0
+          }
+        }
+      }
+    },
+    {
+      "type": "metric",
+      "x": 12,
+      "y": 6,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ "AWS/S3", "TotalRequestLatency", "BucketName", "${BucketName}", "FilterId", "EntireBucket" ]
+        ],
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "${Region}",
+        "title": "S3 Total Request Latency",
+        "period": 60,
+        "stat": "Average",
+        "yAxis": {
+          "left": {
+            "min": 0
+          }
+        }
+      }
+    },
+    {
+      "type": "metric",
+      "x": 0,
+      "y": 12,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ "AWS/S3", "4xxErrors", "BucketName", "${BucketName}", "FilterId", "EntireBucket" ],
+          [ ".", "5xxErrors", ".", ".", ".", "." ]
+        ],
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "${Region}",
+        "title": "S3 Error Count",
+        "period": 60,
+        "stat": "Sum"
+      }
+    },
+    {
+      "type": "metric",
+      "x": 12,
+      "y": 12,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ "AWS/S3", "BucketSizeBytes", "BucketName", "${BucketName}", "StorageType", "StandardStorage" ]
+        ],
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "${Region}",
+        "title": "S3 Bucket Size",
+        "period": 86400,
+        "stat": "Average"
+      }
+    },
+    {
+      "type": "metric",
+      "x": 0,
+      "y": 18,
+      "width": 24,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ "AWS/S3", "NumberOfObjects", "BucketName", "${BucketName}", "StorageType", "AllStorageTypes" ]
+        ],
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "${Region}",
+        "title": "S3 Object Count",
+        "period": 86400,
+        "stat": "Average"
+      }
+    }
+  ]
+}

@@ -1,0 +1,163 @@
+{
+  "widgets": [
+    {
+      "type": "metric",
+      "x": 0,
+      "y": 0,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ "AWS/DynamoDB", "ConsumedReadCapacityUnits", "TableName", "open-saves-stores" ],
+          [ ".", "ConsumedWriteCapacityUnits", ".", "." ]
+        ],
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "${Region}",
+        "title": "Stores Table - Consumed Capacity Units",
+        "period": 60,
+        "stat": "Sum"
+      }
+    },
+    {
+      "type": "metric",
+      "x": 12,
+      "y": 0,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ "AWS/DynamoDB", "ConsumedReadCapacityUnits", "TableName", "open-saves-records" ],
+          [ ".", "ConsumedWriteCapacityUnits", ".", "." ]
+        ],
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "${Region}",
+        "title": "Records Table - Consumed Capacity Units",
+        "period": 60,
+        "stat": "Sum"
+      }
+    },
+    {
+      "type": "metric",
+      "x": 0,
+      "y": 6,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ "AWS/DynamoDB", "ConsumedReadCapacityUnits", "TableName", "open-saves-metadata" ],
+          [ ".", "ConsumedWriteCapacityUnits", ".", "." ]
+        ],
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "${Region}",
+        "title": "Metadata Table - Consumed Capacity Units",
+        "period": 60,
+        "stat": "Sum"
+      }
+    },
+    {
+      "type": "metric",
+      "x": 12,
+      "y": 6,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ "AWS/DynamoDB", "SuccessfulRequestLatency", "TableName", "open-saves-stores", "Operation", "GetItem" ],
+          [ "...", "open-saves-records", ".", "." ],
+          [ "...", "open-saves-metadata", ".", "." ]
+        ],
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "${Region}",
+        "title": "GetItem Latency",
+        "period": 60,
+        "stat": "Average"
+      }
+    },
+    {
+      "type": "metric",
+      "x": 0,
+      "y": 12,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ "AWS/DynamoDB", "SuccessfulRequestLatency", "TableName", "open-saves-stores", "Operation", "PutItem" ],
+          [ "...", "open-saves-records", ".", "." ],
+          [ "...", "open-saves-metadata", ".", "." ]
+        ],
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "${Region}",
+        "title": "PutItem Latency",
+        "period": 60,
+        "stat": "Average"
+      }
+    },
+    {
+      "type": "metric",
+      "x": 12,
+      "y": 12,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ "AWS/DynamoDB", "SuccessfulRequestLatency", "TableName", "open-saves-records", "Operation", "Query" ]
+        ],
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "${Region}",
+        "title": "Query Latency",
+        "period": 60,
+        "stat": "Average"
+      }
+    },
+    {
+      "type": "metric",
+      "x": 0,
+      "y": 18,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ "AWS/DynamoDB", "ThrottledRequests", "TableName", "open-saves-stores", "Operation", "GetItem" ],
+          [ "...", "PutItem" ],
+          [ "...", "Query" ],
+          [ "...", "UpdateItem" ],
+          [ "...", "DeleteItem" ]
+        ],
+        "view": "timeSeries",
+        "stacked": true,
+        "region": "${Region}",
+        "title": "Stores Table - Throttled Requests",
+        "period": 60,
+        "stat": "Sum"
+      }
+    },
+    {
+      "type": "metric",
+      "x": 12,
+      "y": 18,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ "AWS/DynamoDB", "ThrottledRequests", "TableName", "open-saves-records", "Operation", "GetItem" ],
+          [ "...", "PutItem" ],
+          [ "...", "Query" ],
+          [ "...", "UpdateItem" ],
+          [ "...", "DeleteItem" ]
+        ],
+        "view": "timeSeries",
+        "stacked": true,
+        "region": "${Region}",
+        "title": "Records Table - Throttled Requests",
+        "period": 60,
+        "stat": "Sum"
+      }
+    }
+  ]
+}

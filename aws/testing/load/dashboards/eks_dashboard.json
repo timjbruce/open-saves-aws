@@ -1,0 +1,134 @@
+{
+  "widgets": [
+    {
+      "type": "metric",
+      "x": 0,
+      "y": 0,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ "ContainerInsights", "pod_cpu_utilization", "ClusterName", "${ClusterName}", "Namespace", "open-saves", "PodName", "open-saves" ],
+          [ ".", "pod_memory_utilization", ".", ".", ".", ".", ".", "." ]
+        ],
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "${Region}",
+        "title": "Open Saves Pod CPU and Memory Utilization",
+        "period": 60,
+        "stat": "Average"
+      }
+    },
+    {
+      "type": "metric",
+      "x": 12,
+      "y": 0,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ "ContainerInsights", "pod_network_rx_bytes", "ClusterName", "${ClusterName}", "Namespace", "open-saves", "PodName", "open-saves" ],
+          [ ".", "pod_network_tx_bytes", ".", ".", ".", ".", ".", "." ]
+        ],
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "${Region}",
+        "title": "Open Saves Pod Network I/O",
+        "period": 60,
+        "stat": "Average"
+      }
+    },
+    {
+      "type": "metric",
+      "x": 0,
+      "y": 6,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ "ContainerInsights", "pod_number_of_container_restarts", "ClusterName", "${ClusterName}", "Namespace", "open-saves", "PodName", "open-saves" ]
+        ],
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "${Region}",
+        "title": "Open Saves Pod Restarts",
+        "period": 60,
+        "stat": "Sum"
+      }
+    },
+    {
+      "type": "metric",
+      "x": 12,
+      "y": 6,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ "ContainerInsights", "node_cpu_utilization", "ClusterName", "${ClusterName}" ],
+          [ ".", "node_memory_utilization", ".", "." ]
+        ],
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "${Region}",
+        "title": "EKS Node CPU and Memory Utilization",
+        "period": 60,
+        "stat": "Average"
+      }
+    },
+    {
+      "type": "metric",
+      "x": 0,
+      "y": 12,
+      "width": 24,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ { "expression": "SEARCH('{AWS/ApplicationELB,LoadBalancer} MetricName=\"RequestCount\"', 'Sum', 60)", "id": "e1", "period": 60 } ]
+        ],
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "${Region}",
+        "title": "Load Balancer Request Count",
+        "period": 60,
+        "stat": "Sum"
+      }
+    },
+    {
+      "type": "metric",
+      "x": 0,
+      "y": 18,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ { "expression": "SEARCH('{AWS/ApplicationELB,LoadBalancer} MetricName=\"TargetResponseTime\"', 'Average', 60)", "id": "e1", "period": 60 } ]
+        ],
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "${Region}",
+        "title": "Load Balancer Response Time",
+        "period": 60,
+        "stat": "Average"
+      }
+    },
+    {
+      "type": "metric",
+      "x": 12,
+      "y": 18,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          [ { "expression": "SEARCH('{AWS/ApplicationELB,LoadBalancer} MetricName=\"HTTPCode_Target_5XX_Count\"', 'Sum', 60)", "id": "e1", "period": 60 } ],
+          [ { "expression": "SEARCH('{AWS/ApplicationELB,LoadBalancer} MetricName=\"HTTPCode_Target_4XX_Count\"', 'Sum', 60)", "id": "e2", "period": 60 } ]
+        ],
+        "view": "timeSeries",
+        "stacked": false,
+        "region": "${Region}",
+        "title": "Load Balancer Error Counts",
+        "period": 60,
+        "stat": "Sum"
+      }
+    }
+  ]
+}
