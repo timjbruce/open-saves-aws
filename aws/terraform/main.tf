@@ -29,7 +29,7 @@ module "step3_container_images" {
   region       = var.region
   architecture = var.architecture
   ecr_repo_uri = module.step1_cluster_ecr.ecr_repo_uri
-  source_path  = "${path.module}/../aws"
+  source_path  = "${path.module}/../"
   source_hash  = var.source_hash
   s3_bucket_name = module.step2_infrastructure.s3_bucket_name
   redis_endpoint = module.step2_infrastructure.redis_endpoint
@@ -55,4 +55,15 @@ module "step4_compute_app" {
   s3_bucket_name    = module.step2_infrastructure.s3_bucket_name
   redis_endpoint    = module.step2_infrastructure.redis_endpoint
   parameter_store_name = module.step2_infrastructure.parameter_store_name
+}
+
+module "step5_cloudfront_waf" {
+  source = "./modules/step5-cloudfront-waf"
+  
+  region              = var.region
+  architecture        = var.architecture
+  vpc_id              = module.step1_cluster_ecr.vpc_id
+  load_balancer_dns   = module.step4_compute_app.load_balancer_hostname
+  service_account_role_arn = module.step4_compute_app.service_account_role_arn
+  eks_cluster_security_group_id = module.step1_cluster_ecr.cluster_security_group_id
 }

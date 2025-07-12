@@ -25,5 +25,10 @@ output "redis_endpoint" {
 
 output "load_balancer_hostname" {
   description = "Hostname of the load balancer"
-  value       = module.step4_compute_app.load_balancer_hostname
+  value       = try(module.step4_compute_app.load_balancer_hostname, null)
+}
+
+output "cloudfront_domain_name" {
+  description = "CloudFront distribution domain name"
+  value       = try(module.step5_cloudfront_waf.cloudfront_domain_name, null)
 }

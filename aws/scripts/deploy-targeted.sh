@@ -52,6 +52,7 @@ while [[ $# -gt 0 ]]; do
       echo "                                  2: Infrastructure (DynamoDB, S3, Redis)"
       echo "                                  3: Container images"
       echo "                                  4: Compute nodes and application"
+      echo "                                  5: WAF and CloudFront"
       echo "                                  all: All steps in sequence"
       echo "  --destroy                     Destroy the infrastructure instead of deploying"
       echo "  --source-hash HASH            Source hash for container builds (default: timestamp)"
@@ -79,6 +80,7 @@ if [[ -z "$STEP" ]]; then
   echo "  2: Infrastructure (DynamoDB, S3, Redis)"
   echo "  3: Container images"
   echo "  4: Compute nodes and application"
+  echo "  5: WAF and CloudFront"
   echo "  all: All steps in sequence"
   exit 1
 fi
@@ -148,6 +150,10 @@ case $STEP in
     echo -e "${YELLOW}Step 4: Deploying compute nodes and application${NC}"
     deploy_module "step4_compute_app" "Compute nodes and application"
     ;;
+  5)
+    echo -e "${YELLOW}Step 5: Deploying WAF and CloudFront${NC}"
+    deploy_module "step5_waf_cloudfront" "WAF and CloudFront"
+    ;;
   all)
     echo -e "${YELLOW}Executing all steps in sequence${NC}"
     
@@ -167,8 +173,14 @@ case $STEP in
       
       echo -e "${YELLOW}Step 4: Deploying compute nodes and application${NC}"
       deploy_module "step4_compute_app" "Compute nodes and application"
+      
+      echo -e "${YELLOW}Step 5: Deploying WAF and CloudFront${NC}"
+      deploy_module "step5_waf_cloudfront" "WAF and CloudFront"
     elif [ "$ACTION" == "destroy" ]; then
       # Destroy in reverse order
+      echo -e "${YELLOW}Step 5: Destroying WAF and CloudFront${NC}"
+      deploy_module "step5_waf_cloudfront" "WAF and CloudFront"
+      
       echo -e "${YELLOW}Step 4: Destroying compute nodes and application${NC}"
       deploy_module "step4_compute_app" "Compute nodes and application"
       
@@ -189,6 +201,7 @@ case $STEP in
     echo "  2: Infrastructure (DynamoDB, S3, Redis)"
     echo "  3: Container images"
     echo "  4: Compute nodes and application"
+    echo "  5: WAF and CloudFront"
     echo "  all: All steps in sequence"
     exit 1
     ;;
@@ -204,5 +217,11 @@ if [ "$ACTION" == "apply" ]; then
     echo -e "2. Check pods: ${GREEN}kubectl get pods -n open-saves${NC}"
     echo -e "3. Get service URL: ${GREEN}kubectl get service -n open-saves${NC}"
     echo -e "4. Run tests: ${GREEN}cd /home/ec2-user/projects/open-saves-aws/aws && ./open-saves-test.sh http://\$SERVICE_URL:8080${NC}"
+  fi
+  
+  if [ "$STEP" == "5" ] || [ "$STEP" == "all" ]; then
+    echo -e "${YELLOW}To access your Open Saves deployment via CloudFront:${NC}"
+    echo -e "1. Get CloudFront domain: ${GREEN}terraform output cloudfront_distribution_domain${NC}"
+    echo -e "2. Run tests: ${GREEN}cd /home/ec2-user/projects/open-saves-aws/aws && ./open-saves-test.sh https://\$CLOUDFRONT_DOMAIN${NC}"
   fi
 fi

@@ -20,11 +20,187 @@ fi
 
 echo -e "${YELLOW}Using configuration from: ${CONFIG_FILE}${NC}"
 
-# Detect architecture or use the provided one
+# Detect architecture from current deployment or use the provided one
 if [ -z "$ARCH" ]; then
-  ARCH="arm64"
+  # Dynamically discover the current EKS cluster and node groups
+  CLUSTER_NAME=$(aws eks list-clusters --region us-west-2 --query 'clusters[0]' --output text 2>/dev/null || echo "")
+  
+  if [ -n "$CLUSTER_NAME" ]; then
+    # Get the first node group from the cluster
+    NODE_GROUP_NAME=$(aws eks list-nodegroups \
+      --cluster-name "$CLUSTER_NAME" \
+      --region us-west-2 \
+      --query 'nodegroups[0]' --output text 2>/dev/null || echo "")
+    
+    if [ -n "$NODE_GROUP_NAME" ]; then
+      # Get the instance type from the node group
+      NODE_INSTANCE_TYPE=$(aws eks describe-nodegroup \
+        --cluster-name "$CLUSTER_NAME" \
+        --nodegroup-name "$NODE_GROUP_NAME" \
+        --region us-west-2 \
+        --query 'nodegroup.instanceTypes[0]' --output text 2>/dev/null || echo "")
+      
+      echo -e "${YELLOW}Detected cluster: $CLUSTER_NAME, node group: $NODE_GROUP_NAME, instance type: $NODE_INSTANCE_TYPE${NC}"
+    fi
+  fi
+  
+  # Determine architecture based on instance type
+  if [[ "$NODE_INSTANCE_TYPE" == t4g* ]] || [[ "$NODE_INSTANCE_TYPE" == m6g* ]] || [[ "$NODE_INSTANCE_TYPE" == c6g* ]] || [[ "$NODE_INSTANCE_TYPE" == a1* ]] || [[ "$NODE_INSTANCE_TYPE" == m6gd* ]] || [[ "$NODE_INSTANCE_TYPE" == c6gd* ]] || [[ "$NODE_INSTANCE_TYPE" == r6g* ]]; then
+    ARCH="arm64"
+  elif [[ "$NODE_INSTANCE_TYPE" == t3* ]] || [[ "$NODE_INSTANCE_TYPE" == m5* ]] || [[ "$NODE_INSTANCE_TYPE" == c5* ]] || [[ "$NODE_INSTANCE_TYPE" == t2* ]] || [[ "$NODE_INSTANCE_TYPE" == m4* ]] || [[ "$NODE_INSTANCE_TYPE" == c4* ]]; then
+    ARCH="amd64"
+  else
+    echo -e "${YELLOW}Warning: Unable to detect architecture from instance type '$NODE_INSTANCE_TYPE', defaulting to amd64${NC}"
+    ARCH="amd64"  # Default to amd64 if unable to detect
+  fi
 fi
 echo -e "${YELLOW}Using architecture: ${ARCH}${NC}"
+
+# Function to create test instance based on architecture
+create_test_instance() {
+  local arch=$1
+  local instance_type
+  local ami_id
+  
+  # Determine instance type and AMI based on architecture
+  if [ "$arch" == "amd64" ]; then
+    instance_type="t3.micro"
+    echo -e "${YELLOW}Creating Intel/AMD64 test instance...${NC}"
+    echo -e "${YELLOW}Looking up latest AMD64 Amazon Linux 2 AMI...${NC}"
+    ami_id=$(aws ec2 describe-images \
+      --owners amazon \
+      --filters \
+        "Name=name,Values=amzn2-ami-hvm-*" \
+        "Name=architecture,Values=x86_64" \
+        "Name=virtualization-type,Values=hvm" \
+        "Name=state,Values=available" \
+      --query 'Images | sort_by(@, &CreationDate) | [-1].ImageId' \
+      --output text \
+      --region us-west-2 2>/dev/null)
+  else
+    instance_type="t4g.micro"
+    echo -e "${YELLOW}Creating ARM64 test instance...${NC}"
+    echo -e "${YELLOW}Looking up latest ARM64 Amazon Linux 2 AMI...${NC}"
+    ami_id=$(aws ec2 describe-images \
+      --owners amazon \
+      --filters \
+        "Name=name,Values=amzn2-ami-hvm-*" \
+        "Name=architecture,Values=arm64" \
+        "Name=virtualization-type,Values=hvm" \
+        "Name=state,Values=available" \
+      --query 'Images | sort_by(@, &CreationDate) | [-1].ImageId' \
+      --output text \
+      --region us-west-2 2>/dev/null)
+  fi
+  
+  # Validate that we found a valid AMI ID
+  if [ -z "$ami_id" ] || [ "$ami_id" == "None" ]; then
+    echo -e "${RED}Error: Could not find a valid AMI ID for $arch architecture in us-west-2${NC}"
+    return 1
+  fi
+  
+  echo -e "${YELLOW}Using AMI ID: $ami_id for $arch architecture${NC}"
+  
+  # Get VPC and subnet info from current deployment
+  VPC_ID=$(aws ec2 describe-vpcs --filters "Name=tag:Name,Values=open-saves-cluster-new-vpc" --query 'Vpcs[0].VpcId' --output text --region us-west-2)
+  SUBNET_ID=$(aws ec2 describe-subnets --filters "Name=vpc-id,Values=$VPC_ID" "Name=tag:Name,Values=*public*" --query 'Subnets[0].SubnetId' --output text --region us-west-2)
+  
+  # Validate VPC and subnet were found
+  if [ -z "$VPC_ID" ] || [ "$VPC_ID" == "None" ]; then
+    echo -e "${RED}Error: Could not find Open Saves VPC${NC}"
+    return 1
+  fi
+  
+  if [ -z "$SUBNET_ID" ] || [ "$SUBNET_ID" == "None" ]; then
+    echo -e "${RED}Error: Could not find public subnet in VPC $VPC_ID${NC}"
+    return 1
+  fi
+  
+  echo -e "${YELLOW}Using VPC: $VPC_ID, Subnet: $SUBNET_ID${NC}"
+  
+  # Create security group for test instance
+  SG_ID=$(aws ec2 create-security-group \
+    --group-name "open-saves-test-sg-$arch" \
+    --description "Security group for Open Saves test instance ($arch)" \
+    --vpc-id $VPC_ID \
+    --region us-west-2 \
+    --query 'GroupId' --output text 2>/dev/null || \
+    aws ec2 describe-security-groups \
+    --filters "Name=group-name,Values=open-saves-test-sg-$arch" \
+    --query 'SecurityGroups[0].GroupId' --output text --region us-west-2)
+  
+  # Add SSH access rule (if not exists)
+  aws ec2 authorize-security-group-ingress \
+    --group-id $SG_ID \
+    --protocol tcp \
+    --port 22 \
+    --cidr 0.0.0.0/0 \
+    --region us-west-2 2>/dev/null || true
+  
+  # Create the test instance
+  INSTANCE_ID=$(aws ec2 run-instances \
+    --image-id $ami_id \
+    --count 1 \
+    --instance-type $instance_type \
+    --security-group-ids $SG_ID \
+    --subnet-id $SUBNET_ID \
+    --tag-specifications "ResourceType=instance,Tags=[{Key=Name,Value=open-saves-test-$arch},{Key=Architecture,Value=$arch},{Key=Purpose,Value=testing}]" \
+    --region us-west-2 \
+    --query 'Instances[0].InstanceId' --output text)
+  
+  echo -e "${YELLOW}Created test instance: $INSTANCE_ID ($instance_type, $arch)${NC}"
+  
+  # Wait for instance to be running
+  echo -e "${YELLOW}Waiting for instance to be running...${NC}"
+  aws ec2 wait instance-running --instance-ids $INSTANCE_ID --region us-west-2
+  
+  # Get instance details
+  INSTANCE_INFO=$(aws ec2 describe-instances --instance-ids $INSTANCE_ID --region us-west-2 --query 'Reservations[0].Instances[0]')
+  PUBLIC_IP=$(echo $INSTANCE_INFO | jq -r '.PublicIpAddress')
+  PRIVATE_IP=$(echo $INSTANCE_INFO | jq -r '.PrivateIpAddress')
+  
+  echo -e "${GREEN}Test instance created successfully:${NC}"
+  echo -e "  Instance ID: $INSTANCE_ID"
+  echo -e "  Instance Type: $instance_type"
+  echo -e "  Architecture: $arch"
+  echo -e "  Public IP: $PUBLIC_IP"
+  echo -e "  Private IP: $PRIVATE_IP"
+  
+  # Store instance ID for cleanup
+  echo $INSTANCE_ID > /tmp/test-instance-$arch.id
+}
+
+# Function to cleanup test instance
+cleanup_test_instance() {
+  local arch=$1
+  local instance_file="/tmp/test-instance-$arch.id"
+  
+  if [ -f "$instance_file" ]; then
+    INSTANCE_ID=$(cat $instance_file)
+    echo -e "${YELLOW}Terminating test instance: $INSTANCE_ID${NC}"
+    aws ec2 terminate-instances --instance-ids $INSTANCE_ID --region us-west-2 > /dev/null
+    rm -f $instance_file
+    
+    # Cleanup security group after instance termination
+    echo -e "${YELLOW}Waiting for instance termination...${NC}"
+    aws ec2 wait instance-terminated --instance-ids $INSTANCE_ID --region us-west-2
+    
+    # Delete security group
+    SG_ID=$(aws ec2 describe-security-groups \
+      --filters "Name=group-name,Values=open-saves-test-sg-$arch" \
+      --query 'SecurityGroups[0].GroupId' --output text --region us-west-2 2>/dev/null)
+    
+    if [ "$SG_ID" != "None" ] && [ -n "$SG_ID" ]; then
+      aws ec2 delete-security-group --group-id $SG_ID --region us-west-2 2>/dev/null || true
+      echo -e "${GREEN}Cleaned up security group: $SG_ID${NC}"
+    fi
+    
+    echo -e "${GREEN}Test instance cleanup completed${NC}"
+  fi
+}
+
+# Create test instance for the specified architecture
+create_test_instance $ARCH
 
 # Check if service URL is provided
 if [ -z "$1" ]; then
@@ -48,9 +224,13 @@ test_result() {
     echo -e "${GREEN}✅ PASS: $2${NC}"
   else
     echo -e "${RED}❌ FAIL: $2${NC}"
+    cleanup_test_instance $ARCH
     exit 1
   fi
 }
+
+# Set trap to cleanup on script exit
+trap 'cleanup_test_instance $ARCH' EXIT
 
 # 0. Test Redis connectivity
 section "Testing Redis Connectivity"
@@ -504,3 +684,7 @@ fi
 section "Test Summary"
 echo -e "${GREEN}All tests passed successfully!${NC}"
 echo "The Open Saves AWS implementation is fully functional and ready for use."
+
+# Cleanup test instance
+section "Cleaning Up Test Instance"
+cleanup_test_instance $ARCH

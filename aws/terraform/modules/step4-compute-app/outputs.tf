@@ -12,3 +12,8 @@ output "namespace" {
   description = "Kubernetes namespace for Open Saves"
   value       = kubernetes_namespace.open_saves.metadata[0].name
 }
+
+output "service_account_role_arn" {
+  description = "ARN of the service account IAM role"
+  value       = aws_iam_role.service_account_role.arn
+}

@@ -86,7 +86,10 @@ resource "aws_iam_role_policy" "node_ssm_policy" {
           "ssm:GetParameters"
         ]
         Effect   = "Allow"
-        Resource = "arn:aws:ssm:${var.region}:*:parameter/open-saves/*"
+        Resource = [
+          "arn:aws:ssm:${var.region}:*:parameter/open-saves/*",
+          "arn:aws:ssm:${var.region}:*:parameter/etc/open-saves/*"
+        ]
       }
     ]
   })
@@ -124,17 +127,39 @@ resource "aws_iam_role_policy" "dynamodb_policy" {
     Version = "2012-10-17"
     Statement = [
       {
+        # Stores Table permissions
         Action = [
-          "dynamodb:GetItem",
           "dynamodb:PutItem",
-          "dynamodb:DeleteItem",
-          "dynamodb:Query",
+          "dynamodb:GetItem",
           "dynamodb:Scan",
+          "dynamodb:DeleteItem"
+        ]
+        Effect   = "Allow"
+        Resource = var.dynamodb_table_arns[0] # Stores table ARN
+      },
+      {
+        # Records Table permissions
+        Action = [
+          "dynamodb:PutItem",
+          "dynamodb:GetItem",
+          "dynamodb:Query",
           "dynamodb:UpdateItem",
+          "dynamodb:DeleteItem",
           "dynamodb:BatchWriteItem"
         ]
         Effect   = "Allow"
-        Resource = var.dynamodb_table_arns
+        Resource = var.dynamodb_table_arns[1] # Records table ARN
+      },
+      {
+        # Metadata Table permissions
+        Action = [
+          "dynamodb:PutItem",
+          "dynamodb:GetItem",
+          "dynamodb:DeleteItem",
+          "dynamodb:Query"
+        ]
+        Effect   = "Allow"
+        Resource = var.dynamodb_table_arns[2] # Metadata table ARN
       }
     ]
   })
@@ -178,7 +203,10 @@ resource "aws_iam_role_policy" "ssm_policy" {
           "ssm:GetParameters"
         ]
         Effect   = "Allow"
-        Resource = "arn:aws:ssm:${var.region}:*:parameter/open-saves/*"
+        Resource = [
+          "arn:aws:ssm:${var.region}:*:parameter/open-saves/*",
+          "arn:aws:ssm:${var.region}:*:parameter/etc/open-saves/*"
+        ]
       }
     ]
   })
@@ -186,7 +214,7 @@ resource "aws_iam_role_policy" "ssm_policy" {
 
 # Kubernetes Resources
 
-# Add S3 bucket policy
+# Add S3 bucket policy with necessary permissions for Open Saves
 resource "aws_s3_bucket_policy" "blobs" {
   bucket = var.s3_bucket_id
   policy = jsonencode({
@@ -198,34 +226,31 @@ resource "aws_s3_bucket_policy" "blobs" {
           AWS = aws_iam_role.service_account_role.arn
         }
         Action = [
-          "s3:HeadObject",
           "s3:GetObject",
           "s3:PutObject",
-          "s3:DeleteObject",
-          "s3:ListObjectsV2"
+          "s3:DeleteObject"
         ]
-        Resource = [
-          var.s3_bucket_arn,
-          "${var.s3_bucket_arn}/*"
-        ]
+        Resource = "${var.s3_bucket_arn}/*"
       },
       {
-        Effect    = "Deny"
-        Principal = "*"
-        Action    = "s3:*"
-        Resource = [
-          var.s3_bucket_arn,
-          "${var.s3_bucket_arn}/*"
-        ]
-        Condition = {
-          StringNotEquals = {
-            "aws:PrincipalArn" = aws_iam_role.service_account_role.arn
-          }
+        Effect    = "Allow"
+        Principal = {
+          AWS = aws_iam_role.service_account_role.arn
         }
+        Action   = "s3:ListBucket"
+        Resource = var.s3_bucket_arn
       }
     ]
   })
+  
+  # Ensure the service account role is created first
+  depends_on = [
+    aws_iam_role.service_account_role
+  ]
 }
+
+# Data source to get current AWS account ID
+data "aws_caller_identity" "current" {}
 resource "kubernetes_namespace" "open_saves" {
   metadata {
     name = var.namespace

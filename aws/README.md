@@ -17,7 +17,8 @@ The Open Saves AWS implementation follows a modular architecture with the follow
 1. **EKS Cluster and ECR Registry**: The foundational infrastructure including VPC, subnets, EKS cluster, and ECR repository.
 2. **Infrastructure Layer**: DynamoDB tables, S3 bucket, and ElastiCache Redis cluster.
 3. **Container Images**: Open Saves application container images stored in ECR.
-4. **Compute Layer**: EKS node groups, application pods, and services.
+4. **Compute Layer**: EKS node groups, application pods, and services with auto-scaling capabilities.
+5. **Security Layer**: WAF and CloudFront for protection and content delivery.
 
 ## Deployment
 
@@ -39,8 +40,16 @@ Use the `scripts/deploy-targeted.sh` script to deploy each step individually:
 ```
 
 Where:
-- `<step_number>` is one of: 1, 2, 3, 4, or "all"
+- `<step_number>` is one of: 1, 2, 3, 4, 5, or "all"
 - `<architecture>` is one of: amd64, arm64, or both
+
+#### Step Details
+
+1. **Step 1**: Deploy VPC, EKS cluster, and ECR registry
+2. **Step 2**: Deploy S3 bucket, DynamoDB tables, and ElastiCache Redis
+3. **Step 3**: Build and push container images to ECR
+4. **Step 4**: Deploy compute nodes, application pods, and services with auto-scaling
+5. **Step 5**: Deploy WAF and CloudFront for security and content delivery
 
 #### Examples
 
@@ -56,7 +65,7 @@ Where:
 
 3. Build and push container images:
    ```bash
-   ./scripts/deploy-targeted.sh --step 3 --arch both
+   ./scripts/deploy-targeted.sh --step 3 --arch amd64
    ```
 
 4. Deploy compute nodes and application:
@@ -64,7 +73,12 @@ Where:
    ./scripts/deploy-targeted.sh --step 4 --arch arm64
    ```
 
-5. Deploy all steps in sequence:
+5. Deploy WAF and CloudFront:
+   ```bash
+   ./scripts/deploy-targeted.sh --step 5 --arch amd64
+   ```
+
+6. Deploy all steps in sequence:
    ```bash
    ./scripts/deploy-targeted.sh --step all --arch amd64
    ```
@@ -77,7 +91,7 @@ To destroy resources for a specific step, use the `--destroy` flag:
 ./scripts/deploy-targeted.sh --step <step_number> --arch <architecture> --destroy
 ```
 
-When destroying resources, it's recommended to destroy them in reverse order (4, 3, 2, 1) or use:
+When destroying resources, it's recommended to destroy them in reverse order (5, 4, 3, 2, 1) or use:
 
 ```bash
 ./scripts/deploy-targeted.sh --step all --arch <architecture> --destroy
@@ -122,6 +136,19 @@ After completing Step 4, you can verify the deployment:
 3. Get the service URL:
    ```bash
    kubectl get service -n open-saves
+   ```
+
+After completing Step 5, you can access the application through CloudFront:
+
+1. Get the CloudFront domain:
+   ```bash
+   cd terraform
+   terraform output cloudfront_distribution_domain
+   ```
+
+2. Run tests against the CloudFront endpoint:
+   ```bash
+   ./open-saves-test.sh https://<cloudfront-domain>
    ```
 
 ## Troubleshooting
