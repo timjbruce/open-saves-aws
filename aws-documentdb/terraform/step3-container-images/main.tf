@@ -116,7 +116,6 @@ resource "aws_ssm_parameter" "container_image_uri" {
   name      = "/open-saves/step3/container_image_uri_${var.architecture}"
   type      = "String"
   value     = "${data.aws_ssm_parameter.ecr_repo_uri.value}:${var.architecture}"
-  sensitive = true
 
   tags = {
     Environment  = var.environment

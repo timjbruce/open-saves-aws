@@ -119,9 +119,9 @@ rm -f destroy.tfplan
 
 # Clean up SSM parameters
 echo "Cleaning up SSM parameters..."
-aws ssm delete-parameter --name "/open-saves/step2/documentdb_cluster_endpoint" --region "$REGION" 2>/dev/null || true
-aws ssm delete-parameter --name "/open-saves/step2/documentdb_cluster_port" --region "$REGION" 2>/dev/null || true
-aws ssm delete-parameter --name "/open-saves/step2/documentdb_cluster_master_username" --region "$REGION" 2>/dev/null || true
+aws ssm delete-parameter --name "/open-saves/step2/documentdb_endpoint" --region "$REGION" 2>/dev/null || true
+aws ssm delete-parameter --name "/open-saves/step2/documentdb_port" --region "$REGION" 2>/dev/null || true
+aws ssm delete-parameter --name "/open-saves/step2/documentdb_username" --region "$REGION" 2>/dev/null || true
 aws ssm delete-parameter --name "/open-saves/step2/documentdb_password_secret_arn" --region "$REGION" 2>/dev/null || true
 aws ssm delete-parameter --name "/open-saves/step2/s3_bucket_arn" --region "$REGION" 2>/dev/null || true
 aws ssm delete-parameter --name "/open-saves/step2/s3_bucket_id" --region "$REGION" 2>/dev/null || true

@@ -174,8 +174,6 @@ resource "aws_docdb_cluster_instance" "cluster_instances" {
   cluster_identifier = aws_docdb_cluster.main.id
   instance_class     = var.architecture == "arm64" ? "db.t4g.medium" : "db.t3.medium"
   
-  performance_insights_enabled = true
-  
   tags = {
     Name        = "open-saves-docdb-${count.index}"
     Environment = "production"
@@ -316,6 +314,12 @@ resource "aws_ssm_parameter" "s3_bucket_name" {
   name  = "/open-saves/step2/s3_bucket_name"
   type  = "String"
   value = aws_s3_bucket.blobs.bucket
+}
+
+resource "aws_ssm_parameter" "s3_bucket_id" {
+  name  = "/open-saves/step2/s3_bucket_id"
+  type  = "String"
+  value = aws_s3_bucket.blobs.id
 }
 
 resource "aws_ssm_parameter" "s3_bucket_arn" {
