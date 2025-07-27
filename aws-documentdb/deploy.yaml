@@ -1,0 +1,115 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: open-saves
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: open-saves-config
+  namespace: open-saves
+data:
+  config.yaml: |
+    server:
+      http_port: 8080
+      grpc_port: 8081
+    aws:
+      region: "us-west-2"
+      dynamodb:
+        stores_table: "open-saves-stores"
+        records_table: "open-saves-records"
+        metadata_table: "open-saves-metadata"
+      s3:
+        bucket_name: "open-saves-blobs-[accountnumber]"
+      elasticache:
+        address: "[redis-endpoint]:6379"
+        ttl: 3600
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: open-saves
+  namespace: open-saves
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: open-saves
+  template:
+    metadata:
+      labels:
+        app: open-saves
+    spec:
+      containers:
+      - name: open-saves
+        image: [accountnumber].dkr.ecr.us-west-2.amazonaws.com/open-saves:latest
+        ports:
+        - containerPort: 8080
+          name: http
+        - containerPort: 8081
+          name: grpc
+        volumeMounts:
+        - name: config-volume
+          mountPath: /etc/open-saves
+        resources:
+          requests:
+            cpu: 100m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+      volumes:
+      - name: config-volume
+        configMap:
+          name: open-saves-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: open-saves
+  namespace: open-saves
+spec:
+  selector:
+    app: open-saves
+  ports:
+  - port: 8080
+    targetPort: http
+    name: http
+  - port: 8081
+    targetPort: grpc
+    name: grpc
+  type: ClusterIP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: open-saves-lb
+  namespace: open-saves
+spec:
+  selector:
+    app: open-saves
+  ports:
+  - port: 80
+    targetPort: http
+    name: http
+  type: LoadBalancer
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: open-saves-hpa
+  namespace: open-saves
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: open-saves
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70

@@ -1,0 +1,258 @@
+import time
+import json
+import random
+import string
+import base64
+from locust import HttpUser, task, between
+
+game_ids = ["game_1", "game_2", "game_3", "game_4", "game_5"]
+
+def random_string(length=10):
+    """Generate a random string of fixed length."""
+    letters = string.ascii_lowercase
+    return ''.join(random.choice(letters) for i in range(length))
+
+
+def game_id():
+    """return a game id from a list of game ids"""
+    return random.choice(game_ids)
+
+
+def generate_large_text(size_kb=32):
+    """Generate a random text of specified size in KB."""
+    # 1 KB is approximately 1024 characters
+    size_chars = size_kb * 1024
+    return random_string(size_chars)
+
+
+class OpenSavesUser(HttpUser):
+    wait_time = between(1, 3)
+    
+    def on_start(self):
+        """Initialize user with a store."""
+        self.store_key = f"load_test_store_{random_string()}"
+        self.owner_id = f"owner_{random_string(8)}"
+        self.create_store()
+        # Initialize blob_record_keys for tracking records with blobs
+        self.blob_record_keys = []
+    
+    def on_stop(self):
+        """Clean up by deleting the store."""
+        self.delete_store()
+    
+    def create_store(self):
+        """Create a new store."""
+        payload = {
+            "store_id": self.store_key,  # Changed from store_key to store_id
+            "name": f"Load Test Store {random_string()}",
+            "owner_id": self.owner_id
+        }
+        response = self.client.post("/api/stores", json=payload)
+        if response.status_code == 200:
+            self.store_id = self.store_key  # Use the store_key as the ID since that's what we sent
+        else:
+            self.store_id = None
+            print(f"Failed to create store: {response.status_code} {response.text}")
+    
+    def delete_store(self):
+        """Delete the store."""
+        if hasattr(self, 'store_id') and self.store_id:
+            response = self.client.delete(f"/api/stores/{self.store_id}")
+            if response.status_code != 200:
+                print(f"Failed to delete store: {response.status_code} {response.text}")
+    
+    @task(5)
+    def create_record(self):
+        """Create a new record in the store."""
+        if not hasattr(self, 'store_id') or not self.store_id:
+            return
+        
+        record_key = f"record_{random_string()}"
+        payload = {
+            "record_id": record_key,
+            "owner_id": self.owner_id,
+            "game_id": game_id(),
+            "properties": {
+                "test_prop_1": {"type": "STRING", "string_value": random_string(5)},
+                "test_prop_2": {"type": "INTEGER", "integer_value": random.randint(1, 1000)}
+            }
+        }
+        response = self.client.post(f"/api/stores/{self.store_id}/records", json=payload)
+        if response.status_code != 200:
+            print(f"Failed to create record: {response.status_code} {response.text}")
+        else:
+            # Initialize record_keys if it doesn't exist
+            if not hasattr(self, 'record_keys') or self.record_keys is None:
+                self.record_keys = []
+            # Add the new record key to our list
+            self.record_keys.append(record_key)
+    
+    @task(4)
+    def create_record_with_blob(self):
+        """Create a new record with a 32KB blob in the store."""
+        if not hasattr(self, 'store_id') or not self.store_id:
+            return
+        
+        record_key = f"blob_record_{random_string()}"
+        
+        # Generate 32KB of text data
+        blob_data = generate_large_text(32)
+        
+        # Base64 encode the blob data
+        blob_base64 = base64.b64encode(blob_data.encode('utf-8')).decode('utf-8')
+        
+        payload = {
+            "record_id": record_key,
+            "owner_id": self.owner_id,
+            "game_id": game_id(),
+            "properties": {
+                "test_prop_1": {"type": "STRING", "string_value": random_string(5)},
+                "test_prop_2": {"type": "INTEGER", "integer_value": random.randint(1, 1000)}
+            },
+            "blob": blob_base64
+        }
+        
+        response = self.client.post(f"/api/stores/{self.store_id}/records", json=payload)
+        if response.status_code != 200:
+            print(f"Failed to create record with blob: {response.status_code} {response.text}")
+        else:
+            # Initialize record_keys if it doesn't exist
+            if not hasattr(self, 'record_keys') or self.record_keys is None:
+                self.record_keys = []
+            # Add the new record key to our lists
+            self.record_keys.append(record_key)
+            self.blob_record_keys.append(record_key)
+    
+    @task(3)
+    def get_blob_record(self):
+        """Get a record with blob from the store."""
+        if not hasattr(self, 'store_id') or not self.store_id or not hasattr(self, 'blob_record_keys') or not self.blob_record_keys:
+            return
+        
+        if self.blob_record_keys:
+            record_key = random.choice(self.blob_record_keys)
+            response = self.client.get(f"/api/stores/{self.store_id}/records/{record_key}")
+            if response.status_code != 200:
+                print(f"Failed to get blob record: {response.status_code} {response.text}")
+    
+    @task(2)
+    def update_record_with_blob(self):
+        """Update a record with a new 32KB blob."""
+        if not hasattr(self, 'store_id') or not self.store_id or not hasattr(self, 'blob_record_keys') or not self.blob_record_keys:
+            return
+        
+        if self.blob_record_keys:
+            record_key = random.choice(self.blob_record_keys)
+            
+            # Generate new 32KB of text data
+            blob_data = generate_large_text(32)
+            
+            # Base64 encode the blob data
+            blob_base64 = base64.b64encode(blob_data.encode('utf-8')).decode('utf-8')
+            
+            payload = {
+                "properties": {
+                    "updated_prop": {"type": "STRING", "string_value": random_string(5)},
+                    "timestamp": {"type": "INTEGER", "integer_value": int(time.time())}
+                },
+                "blob": blob_base64
+            }
+            
+            response = self.client.put(f"/api/stores/{self.store_id}/records/{record_key}", json=payload)
+            if response.status_code != 200:
+                print(f"Failed to update record with blob: {response.status_code} {response.text}")
+    
+    @task(10)
+    def get_record(self):
+        """Get a record from the store."""
+        if not hasattr(self, 'store_id') or not self.store_id or not hasattr(self, 'record_keys') or not self.record_keys:
+            return
+        
+        if self.record_keys:
+            record_key = random.choice(self.record_keys)
+            self.client.get(f"/api/stores/{self.store_id}/records/{record_key}")
+    
+    @task(3)
+    def update_record(self):
+        """Update a record in the store."""
+        if not hasattr(self, 'store_id') or not self.store_id or not hasattr(self, 'record_keys') or not self.record_keys:
+            return
+        
+        if self.record_keys:
+            record_key = random.choice(self.record_keys)
+            payload = {
+                "properties": {
+                    "updated_prop": {"type": "STRING", "string_value": random_string(5)},
+                    "timestamp": {"type": "INTEGER", "integer_value": int(time.time())}
+                }
+            }
+            response = self.client.put(f"/api/stores/{self.store_id}/records/{record_key}", json=payload)
+            if response.status_code != 200:
+                print(f"Failed to update record: {response.status_code} {response.text}")
+    
+    @task(2)
+    def delete_record(self):
+        """Delete a record from the store."""
+        if not hasattr(self, 'store_id') or not self.store_id or not hasattr(self, 'record_keys') or not self.record_keys:
+            return
+        
+        if self.record_keys:
+            record_key = random.choice(self.record_keys)
+            response = self.client.delete(f"/api/stores/{self.store_id}/records/{record_key}")
+            if response.status_code == 200:
+                self.record_keys.remove(record_key)
+                # Also remove from blob_record_keys if it exists there
+                if hasattr(self, 'blob_record_keys') and record_key in self.blob_record_keys:
+                    self.blob_record_keys.remove(record_key)
+            else:
+                print(f"Failed to delete record: {response.status_code} {response.text}")
+    
+    @task(1)
+    def list_records(self):
+        """List records in the store."""
+        if not hasattr(self, 'store_id') or not self.store_id:
+            return
+        
+        response = self.client.get(f"/api/stores/{self.store_id}/records")
+        if response.status_code == 200:
+            try:
+                records = response.json().get("records", [])
+                self.record_keys = [record.get("record_id") for record in records]  # Changed from key to record_id
+                
+                # Update blob_record_keys based on records that have blobs
+                self.blob_record_keys = [record.get("record_id") for record in records if record.get("blob_size", 0) > 0]
+            except Exception as e:
+                print(f"Failed to parse list records response: {e}")
+        else:
+            print(f"Failed to list records: {response.status_code} {response.text}")
+    
+    @task(1)
+    def get_store(self):
+        """Get store details."""
+        if not hasattr(self, 'store_id') or not self.store_id:
+            return
+        
+        response = self.client.get(f"/api/stores/{self.store_id}")
+        if response.status_code != 200:
+            print(f"Failed to get store: {response.status_code} {response.text}")
+    
+    @task(3)
+    def query_records_by_owner(self):
+        """Query records by owner_id."""
+        if not hasattr(self, 'store_id') or not self.store_id or not hasattr(self, 'owner_id'):
+            return
+        
+        response = self.client.get(f"/api/stores/{self.store_id}/records?owner_id={self.owner_id}")
+        if response.status_code != 200:
+            print(f"Failed to query records by owner: {response.status_code} {response.text}")
+    
+    @task(3)
+    def query_records_by_game(self):
+        """Query records by game_id."""
+        if not hasattr(self, 'store_id') or not self.store_id:
+            return
+        
+        selected_game_id = game_id()
+        response = self.client.get(f"/api/stores/{self.store_id}/records?game_id={selected_game_id}")
+        if response.status_code != 200:
+            print(f"Failed to query records by game: {response.status_code} {response.text}")
