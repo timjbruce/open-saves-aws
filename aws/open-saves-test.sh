@@ -327,7 +327,7 @@ section "Testing Record Operations"
 
 echo -e "\n${YELLOW}Creating a test record...${NC}"
 record_id="test-record-$(date +%s)"
-record_data="{\"record_id\":\"${record_id}\",\"owner_id\":\"test-owner\",\"tags\":[\"test\",\"demo\"],\"properties\":{\"score\":100,\"level\":5}}"
+record_data="{\"record_id\":\"${record_id}\",\"tags\":[\"test\",\"demo\"],\"properties\":{\"score\":100,\"level\":5,\"owner_id\":\"test-owner\"}}"
 echo "Request data: ${record_data}"
 response=$(curl -s -X POST -H "Content-Type: application/json" -d "${record_data}" ${SERVICE_URL}/api/stores/${store_id}/records)
 echo "Response data: ${response}"
@@ -422,7 +422,7 @@ echo -e "\n${YELLOW}Creating multiple records with the same owner...${NC}"
 query_owner="query-owner-$(date +%s)"
 for i in {1..3}; do
   query_record="query-record-${i}-$(date +%s)"
-  curl -s -X POST -H "Content-Type: application/json" -d "{\"record_id\":\"${query_record}\",\"owner_id\":\"${query_owner}\",\"tags\":[\"query\",\"test\"],\"properties\":{\"score\":${i}0,\"level\":${i}}}" \
+  curl -s -X POST -H "Content-Type: application/json" -d "{\"record_id\":\"${query_record}\",\"tags\":[\"query\",\"test\"],\"properties\":{\"score\":${i}0,\"level\":${i},\"owner_id\":\"${query_owner}\"}}" \
     ${SERVICE_URL}/api/stores/${store_id}/records > /dev/null
 done
 
@@ -441,7 +441,7 @@ section "Testing Update and Delete Operations"
 
 echo -e "\n${YELLOW}Creating a record to update...${NC}"
 update_record="update-record-$(date +%s)"
-update_create_data="{\"record_id\":\"${update_record}\",\"owner_id\":\"update-owner\",\"tags\":[\"update\",\"test\"],\"properties\":{\"score\":50,\"level\":5}}"
+update_create_data="{\"record_id\":\"${update_record}\",\"tags\":[\"update\",\"test\"],\"properties\":{\"score\":50,\"level\":5, \"owner_id\":\"update-owner\"}}"
 echo "Request data: ${update_create_data}"
 response=$(curl -s -X POST -H "Content-Type: application/json" -d "${update_create_data}" ${SERVICE_URL}/api/stores/${store_id}/records)
 echo "Response data: ${response}"
@@ -456,7 +456,7 @@ else
 fi
 
 echo -e "\n${YELLOW}Updating the record...${NC}"
-update_data="{\"owner_id\":\"updated-owner\",\"tags\":[\"updated\",\"test\"],\"properties\":{\"score\":100,\"level\":10}}"
+update_data="{\"tags\":[\"updated\",\"test\"],\"properties\":{\"score\":100,\"level\":10, \"owner_id\":\"updated-owner\"}}"
 echo "Request data: ${update_data}"
 response=$(curl -s -X PUT -H "Content-Type: application/json" -d "${update_data}" ${SERVICE_URL}/api/stores/${store_id}/records/${update_record})
 echo "Response data: ${response}"
@@ -494,7 +494,7 @@ section "Testing Blob Operations"
 
 echo -e "\n${YELLOW}Creating a record for blob testing...${NC}"
 blob_record="blob-record-$(date +%s)"
-curl -s -X POST -H "Content-Type: application/json" -d "{\"record_id\":\"${blob_record}\",\"owner_id\":\"blob-owner\",\"tags\":[\"blob\",\"test\"]}" \
+curl -s -X POST -H "Content-Type: application/json" -d "{\"record_id\":\"${blob_record}\",\"properties\": {\"owner_id\":\"blob-owner\"},\"tags\":[\"blob\",\"test\"]}" \
   ${SERVICE_URL}/api/stores/${store_id}/records > /dev/null
 
 echo -e "\n${YELLOW}Uploading multiple blobs...${NC}"

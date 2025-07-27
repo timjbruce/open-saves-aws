@@ -420,7 +420,7 @@ func TestDynamoDBStore_QueryRecords(t *testing.T) {
 
 	// Query records by owner
 	query := &Query{
-		Filter: "owner1",
+		OwnerID: "owner1",
 	}
 	records, err := store.QueryRecords(ctx, storeID, query)
 	if err != nil {

@@ -364,7 +364,7 @@ func TestIntegration_FullWorkflow(t *testing.T) {
 
 	// 9. Query records
 	query := &Query{
-		Filter: "integration-owner",
+		OwnerID: "integration-owner",
 	}
 	records, err := store.QueryRecords(ctx, storeID, query)
 	if err != nil {

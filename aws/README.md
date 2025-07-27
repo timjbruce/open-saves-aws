@@ -9,169 +9,322 @@ Open Saves AWS uses the following AWS services:
 - Amazon DynamoDB for metadata and small record storage
 - Amazon S3 for blob storage
 - Amazon ElastiCache Redis for caching
+- Amazon CloudFront and WAF for security and performance
 
 ## Architecture
 
-The Open Saves AWS implementation follows a modular architecture with the following components:
+The Open Saves AWS implementation follows a completely independent step-based architecture:
 
-1. **EKS Cluster and ECR Registry**: The foundational infrastructure including VPC, subnets, EKS cluster, and ECR repository.
-2. **Infrastructure Layer**: DynamoDB tables, S3 bucket, and ElastiCache Redis cluster.
-3. **Container Images**: Open Saves application container images stored in ECR.
-4. **Compute Layer**: EKS node groups, application pods, and services with auto-scaling capabilities.
-5. **Security Layer**: WAF and CloudFront for protection and content delivery.
+1. **Step 1 - EKS Cluster and ECR**: VPC, subnets, EKS cluster, and ECR repository
+2. **Step 2 - Data Infrastructure**: DynamoDB tables, S3 bucket, and ElastiCache Redis
+3. **Step 3 - Container Images**: Build and push Open Saves container images
+4. **Step 4 - Compute and Application**: EKS node groups, Kubernetes resources, and application deployment
+5. **Step 5 - CloudFront and WAF**: CDN and security layer for production traffic
 
-## Deployment
+## Key Features
 
-The deployment is managed through Terraform and is divided into discrete steps that can be executed individually.
+- **Complete Independence**: Each step has its own Terraform state and can be deployed/destroyed independently
+- **Parameter Store Integration**: Steps communicate via AWS SSM Parameter Store instead of Terraform outputs
+- **Architecture Support**: Full support for both AMD64 and ARM64 architectures with easy switching
+- **Security Best Practices**: Implements principle of least privilege with detailed IAM policies
+- **Production Ready**: CloudFront CDN, WAF protection, comprehensive monitoring
+- **Easy Teardown**: Proper reverse-order teardown with dependency handling
 
-### Prerequisites
+## Prerequisites
 
-- AWS CLI configured with appropriate credentials
-- Terraform installed (version 1.0.0 or later)
-- Docker installed (for building container images)
-- kubectl installed (for interacting with the Kubernetes cluster)
+- AWS CLI configured with appropriate permissions
+- Terraform >= 1.0
+- Docker (for container image building)
+- Go >= 1.19 (for application building)
+- kubectl (for Kubernetes management)
 
-### Deployment Steps
+## Quick Start
 
-Use the `scripts/deploy-targeted.sh` script to deploy each step individually:
+### Option 1: Master Deployment Script (Recommended)
 
 ```bash
-./scripts/deploy-targeted.sh --step <step_number> --arch <architecture>
+cd terraform
+
+# Deploy everything for AMD64
+./deploy-full.sh --architecture amd64
+
+# Deploy everything for ARM64
+./deploy-full.sh --architecture arm64
+
+# Interactive deployment with confirmations
+./deploy-full.sh --interactive --architecture amd64
+
+# Deploy only specific steps
+./deploy-full.sh --only-steps "3,4,5" --architecture arm64
 ```
 
-Where:
-- `<step_number>` is one of: 1, 2, 3, 4, 5, or "all"
-- `<architecture>` is one of: amd64, arm64, or both
-
-#### Step Details
-
-1. **Step 1**: Deploy VPC, EKS cluster, and ECR registry
-2. **Step 2**: Deploy S3 bucket, DynamoDB tables, and ElastiCache Redis
-3. **Step 3**: Build and push container images to ECR
-4. **Step 4**: Deploy compute nodes, application pods, and services with auto-scaling
-5. **Step 5**: Deploy WAF and CloudFront for security and content delivery
-
-#### Examples
-
-1. Deploy only the EKS cluster and ECR registry:
-   ```bash
-   ./scripts/deploy-targeted.sh --step 1 --arch amd64
-   ```
-
-2. Deploy only the infrastructure components:
-   ```bash
-   ./scripts/deploy-targeted.sh --step 2 --arch arm64
-   ```
-
-3. Build and push container images:
-   ```bash
-   ./scripts/deploy-targeted.sh --step 3 --arch amd64
-   ```
-
-4. Deploy compute nodes and application:
-   ```bash
-   ./scripts/deploy-targeted.sh --step 4 --arch arm64
-   ```
-
-5. Deploy WAF and CloudFront:
-   ```bash
-   ./scripts/deploy-targeted.sh --step 5 --arch amd64
-   ```
-
-6. Deploy all steps in sequence:
-   ```bash
-   ./scripts/deploy-targeted.sh --step all --arch amd64
-   ```
-
-### Destroying Resources
-
-To destroy resources for a specific step, use the `--destroy` flag:
+### Option 2: Individual Step Deployment
 
 ```bash
-./scripts/deploy-targeted.sh --step <step_number> --arch <architecture> --destroy
+cd terraform
+
+# Deploy each step individually
+./deploy-step1.sh
+./deploy-step2.sh --architecture amd64
+./deploy-step3.sh --architecture amd64
+./deploy-step4.sh --architecture amd64
+./deploy-step5.sh --architecture amd64
 ```
 
-When destroying resources, it's recommended to destroy them in reverse order (5, 4, 3, 2, 1) or use:
+### Option 3: Architecture Switching
 
 ```bash
-./scripts/deploy-targeted.sh --step all --arch <architecture> --destroy
+cd terraform
+
+# Switch from current architecture to ARM64
+./switch-architecture.sh --to-arch arm64
+
+# Explicitly switch from AMD64 to ARM64
+./switch-architecture.sh --from-arch amd64 --to-arch arm64
 ```
 
-Alternatively, you can use the cleanup script which will destroy all resources:
+## Deployment Steps Detail
+
+### Step 1: EKS Cluster and ECR Repository
+- Creates VPC with public/private subnets across 3 AZs
+- Deploys EKS cluster with OIDC provider
+- Creates ECR repository for container images
+- Sets up IAM roles and networking components
+
+### Step 2: Data Infrastructure
+- Creates DynamoDB tables (stores, records, metadata) with GSIs
+- Deploys S3 bucket with security configurations
+- Sets up ElastiCache Redis cluster (architecture-specific)
+- Configures security groups and parameter store
+
+### Step 3: Container Images
+- Builds Go application for target architecture
+- Creates Docker images using appropriate Dockerfile
+- Pushes images to ECR with architecture tags
+- Updates configuration files
+
+### Step 4: Compute and Application
+- Deploys EKS node groups with architecture-specific instances
+- Creates Kubernetes namespace, service account, and RBAC
+- Deploys Open Saves application with 2 replicas
+- Sets up load balancer service and IAM policies
+
+### Step 5: CloudFront and WAF
+- Creates CloudFront distribution with custom origin
+- Deploys WAF Web ACLs for security
+- Sets up CloudWatch dashboards for monitoring
+- Configures rate limiting and attack protection
+
+## Teardown
+
+### Complete Teardown
 
 ```bash
-./scripts/cleanup.sh
+cd terraform
+
+# Master teardown script (recommended)
+./teardown-full.sh --architecture amd64 --delete-images --empty-s3 --delete-ecr-images
+
+# Or teardown individual steps in reverse order
+./teardown-step5.sh --architecture amd64
+./teardown-step4.sh --architecture amd64
+./teardown-step3.sh --architecture amd64 --delete-images
+./teardown-step2.sh --empty-s3
+./teardown-step1.sh --delete-ecr-images
 ```
 
 ## Testing
 
-After deployment, you can run tests using the provided test script:
+After deployment, test the API using the provided test script:
 
 ```bash
-./open-saves-test.sh http://<service-url>:8080
+# Test via load balancer (Step 4 complete)
+./open-saves-test.sh http://<load-balancer-hostname>:8080
+
+# Test via CloudFront (Step 5 complete)
+./open-saves-test.sh https://<cloudfront-domain>
 ```
 
-Replace `<service-url>` with the external endpoint from the service output.
+Get endpoints from SSM Parameter Store:
+```bash
+# Load balancer hostname
+aws ssm get-parameter --name "/open-saves/step4/load_balancer_hostname_amd64" --query 'Parameter.Value' --output text
+
+# CloudFront domain
+aws ssm get-parameter --name "/open-saves/step5/cloudfront_domain_name_amd64" --query 'Parameter.Value' --output text
+```
 
 ## Configuration
 
-The deployment uses AWS Systems Manager Parameter Store for configuration. This provides a more secure and centralized way to manage configuration.
+The deployment uses AWS Systems Manager Parameter Store for configuration management:
 
-The Parameter Store parameter is created during Step 2 (Infrastructure) and is used by the application pods deployed in Step 4.
+- **Step Communication**: All steps share data via `/open-saves/stepX/` parameters
+- **Application Config**: Stored in `/etc/open-saves/config.yaml` parameter
+- **Security**: No sensitive data in Terraform state files
 
-## Verifying the Deployment
+## Architecture Support
 
-After completing Step 4, you can verify the deployment:
+### AMD64 Architecture
+- Uses `t3.medium`/`t3.large` for EKS nodes
+- Uses `cache.t3.small` for ElastiCache
+- Standard x86_64 container images
 
-1. Configure kubectl to use your EKS cluster:
-   ```bash
-   aws eks update-kubeconfig --name open-saves-cluster-new --region us-west-2
-   ```
+### ARM64 Architecture  
+- Uses `t4g.medium`/`t4g.large` for EKS nodes
+- Uses `cache.t4g.small` for ElastiCache
+- ARM64-optimized container images
 
-2. Check the pods:
-   ```bash
-   kubectl get pods -n open-saves
-   ```
+### Switching Architectures
+The system supports easy switching between architectures by tearing down and redeploying steps 3-5:
 
-3. Get the service URL:
-   ```bash
-   kubectl get service -n open-saves
-   ```
+```bash
+./switch-architecture.sh --to-arch arm64
+```
 
-After completing Step 5, you can access the application through CloudFront:
+## Monitoring and Observability
 
-1. Get the CloudFront domain:
-   ```bash
-   cd terraform
-   terraform output cloudfront_distribution_domain
-   ```
+### CloudWatch Dashboards
+- **OpenSaves-Security-{architecture}**: WAF metrics, CloudFront requests, error rates
 
-2. Run tests against the CloudFront endpoint:
-   ```bash
-   ./open-saves-test.sh https://<cloudfront-domain>
-   ```
+### Key Metrics
+- WAF blocked/counted requests
+- CloudFront request volume and error rates
+- EKS node and pod health
+- DynamoDB throttling and errors
+- S3 request metrics
+- ElastiCache performance
+
+### Log Groups
+- `/aws/waf/open-saves-{architecture}`: WAF logs
+- EKS cluster logs (if enabled)
+
+## Security Features
+
+### IAM Policies (Principle of Least Privilege)
+- **DynamoDB**: Specific table and GSI access only
+- **S3**: Bucket and object-level permissions for blob operations
+- **SSM**: Read-only access to Open Saves parameters only
+
+### Network Security
+- Private subnets for all compute resources
+- Security groups with minimal required access
+- CloudFront origin verification headers
+
+### WAF Protection
+- DDoS protection via AWS Shield
+- Rate limiting (configurable)
+- SQL injection protection
+- Geographic restrictions (configurable)
 
 ## Troubleshooting
 
-If you encounter issues during deployment:
+### Common Issues
+1. **Parameter Not Found**: Ensure previous steps completed successfully
+2. **ECR Push Failures**: Check AWS CLI credentials and ECR permissions
+3. **Load Balancer Not Ready**: Wait 5-10 minutes for EKS load balancer provisioning
+4. **CloudFront Deployment**: Can take 15-20 minutes to deploy globally
 
-1. Check the Terraform state:
-   ```bash
-   cd terraform
-   terraform state list
-   ```
+### Verification Commands
+```bash
+# Check parameter store values
+aws ssm get-parameters-by-path --path "/open-saves/" --recursive
 
-2. Check the EKS cluster status:
-   ```bash
-   aws eks describe-cluster --name open-saves-cluster-new --region us-west-2
-   ```
+# Check EKS cluster status
+aws eks describe-cluster --name open-saves-cluster
 
-3. Check the logs of the pods:
-   ```bash
-   kubectl logs -n open-saves <pod-name>
-   ```
+# Check Kubernetes resources
+kubectl get all -n open-saves
 
-4. If a step fails, you can retry just that step using the deployment script.
+# Test API endpoints
+curl http://<load-balancer-hostname>:8080/health
+```
+
+### Cleanup Stuck Resources
+If teardown fails due to stuck resources, you can use the cleanup utilities in the old terraform directory:
+
+```bash
+cd terraform-old-approach
+./cleanup-vpc.sh
+./force-cleanup-vpc.sh
+```
+
+## Directory Structure
+
+```
+aws/
+├── terraform/                    # Independent Terraform steps
+│   ├── step1-cluster-ecr/       # EKS cluster and ECR
+│   ├── step2-infrastructure/    # DynamoDB, S3, ElastiCache
+│   ├── step3-container-images/  # Container image builds
+│   ├── step4-compute-app/       # EKS nodes and application
+│   ├── step5-cloudfront-waf/    # CloudFront and WAF
+│   ├── deploy-full.sh           # Master deployment script
+│   ├── teardown-full.sh         # Master teardown script
+│   ├── switch-architecture.sh   # Architecture switching
+│   └── README.md                # Detailed deployment guide
+├── terraform-old-approach/      # Archived old approach
+├── open-saves-test.sh           # API testing script
+└── README.md                    # This file
+```
+
+## Advanced Usage
+
+### Selective Deployment
+```bash
+# Deploy only infrastructure steps
+./deploy-full.sh --only-steps "1,2" --architecture amd64
+
+# Skip CloudFront deployment
+./deploy-full.sh --skip-steps "5" --architecture arm64
+```
+
+### Interactive Mode
+```bash
+# Prompt before each step
+./deploy-full.sh --interactive --architecture amd64
+```
+
+### Custom Configuration
+```bash
+# Custom cluster name and region
+./deploy-step1.sh --cluster-name my-cluster --region us-west-2
+
+# Custom source path for container builds
+./deploy-step3.sh --source-path /path/to/source --architecture arm64
+```
+
+## Cost Optimization
+
+### Development Environment
+- Use `t3.medium`/`t4g.medium` for EKS nodes
+- Use `cache.t3.small`/`cache.t4g.small` for ElastiCache
+- Deploy only necessary steps (skip Step 5 for development)
+
+### Production Environment
+- Scale up instance types as needed
+- Enable CloudFront (Step 5) for global performance
+- Monitor costs via AWS Cost Explorer
+
+## Contributing
+
+When modifying the deployment:
+
+1. Maintain independence between steps
+2. Use SSM Parameter Store for inter-step communication
+3. Follow established naming conventions
+4. Update both deployment and teardown scripts
+5. Test both AMD64 and ARM64 architectures
+6. Update documentation
+
+## Support
+
+For detailed deployment information, see the [Terraform README](terraform/README.md).
+
+For issues or questions:
+1. Check the troubleshooting sections
+2. Review AWS CloudWatch logs and metrics
+3. Verify all prerequisites are met
+4. Ensure proper step execution order
 
 ## License
 

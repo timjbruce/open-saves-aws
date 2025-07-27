@@ -1,67 +1,68 @@
-# Open Saves AWS Load Testing
+# Open Saves Load Testing
 
-This directory contains the load testing framework and observability components for the Open Saves AWS implementation.
+This directory contains scripts and configurations for load testing the Open Saves API using Locust.
 
-## Overview
+## Architecture
 
-The load testing framework is designed to test the Open Saves AWS implementation at various load levels, from 100 to 5000 requests per second. It includes:
+The load testing environment consists of:
 
-- Observability dashboards for monitoring system performance
-- Locust-based load testing scripts
-- Analysis tools for processing and visualizing test results
+1. **EC2 Instances**: 
+   - One master instance running the Locust web UI
+   - Multiple worker instances generating load
 
-## Directory Structure
+## Prerequisites
 
-- `infrastructure/`: Terraform files for deploying observability and load testing infrastructure
-- `dashboards/`: CloudWatch and Grafana dashboard definitions
-- `locust/`: Locust test scripts and data
-  - `scenarios/`: Test scenarios for different Open Saves operations
-  - `data/`: Test data templates and sample blobs
-- `analysis/`: Scripts for analyzing and reporting test results
+- AWS CLI configured with appropriate permissions
+- Terraform installed
+- Open Saves deployed with CloudFront endpoint available
 
-## Getting Started
+## Deployment
 
-1. Ensure you have a fully deployed Open Saves AWS environment (Steps 1-5)
-2. Deploy the observability components:
-   ```
-   cd infrastructure
-   terraform init
-   terraform apply
-   ```
-3. Run the load tests:
-   ```
-   cd locust
-   python -m locust -f locustfile.py
-   ```
+### Deploy EC2 Locust Infrastructure
 
-## Test Scenarios
-
-The load testing framework includes the following test scenarios:
-
-1. Basic CRUD operations (stores, records, metadata)
-2. Blob storage operations (upload, download, delete)
-3. Query operations (by owner, tags, etc.)
-4. Mixed workload with configurable read/write ratios
-
-## Observability
-
-The observability components include:
-
-1. CloudWatch dashboards for EKS, DynamoDB, S3, and ElastiCache
-2. AWS Managed Grafana for advanced visualization
-3. CloudWatch alarms for performance thresholds
-
-## Analysis
-
-After running the tests, use the analysis scripts to process the results:
-
-```
-cd analysis
-python process_results.py --input-file ../locust/results.csv
+```bash
+./deploy-ec2-locust.sh --endpoint ENDPOINT [options]
 ```
 
-This will generate visualizations and a summary report of the test results.
+Required parameters:
+- `--endpoint`: CloudFront endpoint for Open Saves (e.g., dlwqqp0bucqw2.cloudfront.net)
 
-## Scaling Recommendations
+Optional parameters:
+- `--region`: AWS region to deploy to (default: from AWS config or us-west-2)
+- `--worker-count`: Number of Locust worker instances (default: 3)
+- `--instance-type`: EC2 instance type for workers (default: c5.large)
+- `--distribution-id`: CloudFront distribution ID (default: EV2NR6DUG279M)
 
-Based on the test results, you may need to scale various components of the Open Saves AWS implementation. See the LOADTESTING.md file in the plan directory for detailed scaling options and recommendations.
+This script will:
+1. Deploy a VPC with public subnets
+2. Launch EC2 instances for Locust master and workers
+3. Configure the instances with the Locust script embedded in user data
+4. Create a CloudWatch dashboard for monitoring
+
+## Accessing the Locust Web UI
+
+After deployment, the script will output the URL for the Locust web UI:
+
+```
+Locust web UI: http://<master-instance-public-ip>:8089
+```
+
+Use this URL to access the Locust web UI and start load tests.
+
+## Monitoring
+
+A CloudWatch dashboard is created for monitoring the Open Saves environment during load testing. The dashboard URL is provided in the output of the deployment script.
+
+## Cleanup
+
+To clean up all resources created for load testing:
+
+```bash
+./cleanup-load-test.sh
+```
+
+This script will delete:
+1. EC2 instances
+2. VPC and networking components
+3. CloudWatch dashboard
+4. IAM roles and policies

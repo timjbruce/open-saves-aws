@@ -280,6 +280,7 @@ func (s *Server) handleRecords(w http.ResponseWriter, r *http.Request, storeID s
 	case http.MethodGet:
 		// Query records
 		ownerID := r.URL.Query().Get("owner_id")
+		gameID := r.URL.Query().Get("game_id")
 		limitStr := r.URL.Query().Get("limit")
 		
 		var limit int
@@ -291,8 +292,9 @@ func (s *Server) handleRecords(w http.ResponseWriter, r *http.Request, storeID s
 		}
 		
 		query := &Query{
-			Filter: ownerID,
-			Limit:  limit,
+			OwnerID: ownerID,
+			GameID:  gameID,
+			Limit:   limit,
 		}
 		
 		records, err := s.store.QueryRecords(ctx, storeID, query)
@@ -430,6 +432,16 @@ func (s *Server) handleRecord(w http.ResponseWriter, r *http.Request, storeID, r
 			log.Printf("Failed to update record: %v", err)
 			http.Error(w, "Failed to update record", http.StatusInternalServerError)
 			return
+		}
+
+		// Invalidate cache entry if it exists
+		if s.cache != nil {
+			if noopCache, ok := s.cache.(*NoOpCache); !ok || noopCache == nil {
+				if err := s.cache.DeleteRecord(ctx, storeID, recordID); err != nil {
+					log.Printf("Failed to invalidate cache for updated record: %v", err)
+					// Continue anyway, the record was updated successfully
+				}
+			}
 		}
 
 		w.WriteHeader(http.StatusOK)

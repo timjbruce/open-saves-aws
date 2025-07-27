@@ -18,6 +18,7 @@ type Record struct {
 	StoreID    string                 `json:"store_id"`
 	RecordID   string                 `json:"record_id"`
 	OwnerID    string                 `json:"owner_id,omitempty"`
+	GameID     string                 `json:"game_id,omitempty"`
 	Tags       []string               `json:"tags,omitempty"`
 	Properties map[string]interface{} `json:"properties,omitempty"`
 	BlobKeys   []string               `json:"blob_keys,omitempty"`
@@ -27,8 +28,9 @@ type Record struct {
 
 // Query represents a query for records
 type Query struct {
-	Filter string `json:"filter,omitempty"`
-	Limit  int    `json:"limit,omitempty"`
+	OwnerID string `json:"owner_id,omitempty"`
+	GameID  string `json:"game_id,omitempty"`
+	Limit   int    `json:"limit,omitempty"`
 }
 
 // Store defines the interface for store operations

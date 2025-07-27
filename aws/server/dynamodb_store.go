@@ -33,7 +33,9 @@ type DynamoDBStoreItem struct {
 type DynamoDBRecordItem struct {
 	StoreID    string                 `json:"store_id"`
 	RecordID   string                 `json:"record_id"`
+	ConcatKey  string				  `json:"concat_key"`
 	OwnerID    string                 `json:"owner_id,omitempty"`
+	GameID     string                 `json:"game_id,omitempty"`	
 	Tags       []string               `json:"tags,omitempty"`
 	Properties map[string]interface{} `json:"properties,omitempty"`
 	BlobKeys   []string               `json:"blob_keys,omitempty"`
@@ -290,10 +292,27 @@ func (s *DynamoDBStore) CreateRecord(ctx context.Context, storeID, recordID stri
 	}
 
 	now := time.Now().Unix()
+	// Extract OwnerID and GameID from Properties map
+	var ownerID, gameID string
+	if record.Properties != nil {
+		if ownerIDVal, exists := record.Properties["owner_id"]; exists && ownerIDVal != nil {
+			if ownerIDStr, ok := ownerIDVal.(string); ok {
+				ownerID = ownerIDStr
+			}
+		}
+		if gameIDVal, exists := record.Properties["game_id"]; exists && gameIDVal != nil {
+			if gameIDStr, ok := gameIDVal.(string); ok {
+				gameID = gameIDStr
+			}
+		}
+	}
+
 	item := DynamoDBRecordItem{
 		StoreID:    storeID,
 		RecordID:   recordID,
-		OwnerID:    record.OwnerID,
+		ConcatKey:  storeID + "#" + recordID,
+		OwnerID:    ownerID,
+		GameID:     gameID,
 		Tags:       record.Tags,
 		Properties: record.Properties,
 		BlobKeys:   record.BlobKeys,
@@ -395,7 +414,6 @@ func (s *DynamoDBStore) GetRecord(ctx context.Context, storeID, recordID string)
 	return &Record{
 		StoreID:    item.StoreID,
 		RecordID:   item.RecordID,
-		OwnerID:    item.OwnerID,
 		Tags:       item.Tags,
 		Properties: item.Properties,
 		BlobKeys:   item.BlobKeys,
@@ -406,52 +424,31 @@ func (s *DynamoDBStore) GetRecord(ctx context.Context, storeID, recordID string)
 
 // QueryRecords queries records in a store
 func (s *DynamoDBStore) QueryRecords(ctx context.Context, storeID string, query *Query) ([]*Record, error) {
-	// Build key condition for the store ID
-	keyCondition := expression.Key("store_id").Equal(expression.Value(storeID))
-	
-	// Build filter for owner_id if provided
-	var filterBuilder expression.ConditionBuilder
-	filterBuilderSet := false
-	
-	if query.Filter != "" {
-		filterBuilder = expression.Name("owner_id").Equal(expression.Value(query.Filter))
-		filterBuilderSet = true
+	var input *dynamodb.QueryInput
+	var err error
+
+	// Determine query type and build appropriate query
+	if query.GameID != "" {
+		// Query by game_id using GameIDIndex
+		input, err = s.buildGameIDQuery(storeID, query)
+	} else if query.OwnerID != "" {
+		// Query by owner_id using OwnerIDIndex
+		input, err = s.buildOwnerIDQuery(storeID, query)
+	} else {
+		// No specific query - scan all records in the store
+		input, err = s.buildStoreQuery(storeID, query)
 	}
-	
-	// Build the expression
-	builder := expression.NewBuilder().WithKeyCondition(keyCondition)
-	if filterBuilderSet {
-		builder = builder.WithFilter(filterBuilder)
-	}
-	
-	expr, err := builder.Build()
+
 	if err != nil {
-		return nil, fmt.Errorf("failed to build expression: %v", err)
+		return nil, fmt.Errorf("failed to build query: %v", err)
 	}
-	
-	// Prepare the query input
-	input := &dynamodb.QueryInput{
-		TableName:                 aws.String(s.recordsTable),
-		KeyConditionExpression:    expr.KeyCondition(),
-		ExpressionAttributeNames:  expr.Names(),
-		ExpressionAttributeValues: expr.Values(),
-	}
-	
-	if filterBuilderSet {
-		input.FilterExpression = expr.Filter()
-	}
-	
-	// Add limit if specified
-	if query.Limit > 0 {
-		input.Limit = aws.Int64(int64(query.Limit))
-	}
-	
+
 	// Execute the query
 	result, err := s.client.QueryWithContext(ctx, input)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query records: %v", err)
 	}
-	
+
 	// Process the results
 	records := make([]*Record, 0, len(result.Items))
 	for _, item := range result.Items {
@@ -465,6 +462,7 @@ func (s *DynamoDBStore) QueryRecords(ctx context.Context, storeID string, query 
 			StoreID:    dbItem.StoreID,
 			RecordID:   dbItem.RecordID,
 			OwnerID:    dbItem.OwnerID,
+			GameID:     dbItem.GameID,
 			Tags:       dbItem.Tags,
 			Properties: dbItem.Properties,
 			BlobKeys:   dbItem.BlobKeys,
@@ -476,6 +474,93 @@ func (s *DynamoDBStore) QueryRecords(ctx context.Context, storeID string, query 
 	return records, nil
 }
 
+// buildGameIDQuery builds a query for the GameIDIndex
+func (s *DynamoDBStore) buildGameIDQuery(storeID string, query *Query) (*dynamodb.QueryInput, error) {
+	// Key condition: game_id = :game_id AND concat_key begins_with :store_prefix
+	keyCondition := expression.Key("game_id").Equal(expression.Value(query.GameID)).
+		And(expression.Key("concat_key").BeginsWith(storeID + "#"))
+
+	builder := expression.NewBuilder().WithKeyCondition(keyCondition)
+
+	// Add limit if specified
+	if query.Limit > 0 {
+		// Note: Limit will be applied to the query input
+	}
+
+	expr, err := builder.Build()
+	if err != nil {
+		return nil, err
+	}
+
+	input := &dynamodb.QueryInput{
+		TableName:                 aws.String(s.recordsTable),
+		IndexName:                 aws.String("GameIDIndex"),
+		KeyConditionExpression:    expr.KeyCondition(),
+		ExpressionAttributeNames:  expr.Names(),
+		ExpressionAttributeValues: expr.Values(),
+	}
+
+	if query.Limit > 0 {
+		input.Limit = aws.Int64(int64(query.Limit))
+	}
+
+	return input, nil
+}
+
+// buildOwnerIDQuery builds a query for the OwnerIDIndex
+func (s *DynamoDBStore) buildOwnerIDQuery(storeID string, query *Query) (*dynamodb.QueryInput, error) {
+	// Key condition: owner_id = :owner_id AND concat_key begins_with :store_prefix
+	keyCondition := expression.Key("owner_id").Equal(expression.Value(query.OwnerID)).
+		And(expression.Key("concat_key").BeginsWith(storeID + "#"))
+
+	builder := expression.NewBuilder().WithKeyCondition(keyCondition)
+
+	expr, err := builder.Build()
+	if err != nil {
+		return nil, err
+	}
+
+	input := &dynamodb.QueryInput{
+		TableName:                 aws.String(s.recordsTable),
+		IndexName:                 aws.String("OwnerIDIndex"),
+		KeyConditionExpression:    expr.KeyCondition(),
+		ExpressionAttributeNames:  expr.Names(),
+		ExpressionAttributeValues: expr.Values(),
+	}
+
+	if query.Limit > 0 {
+		input.Limit = aws.Int64(int64(query.Limit))
+	}
+
+	return input, nil
+}
+
+// buildStoreQuery builds a query for all records in a store (main table)
+func (s *DynamoDBStore) buildStoreQuery(storeID string, query *Query) (*dynamodb.QueryInput, error) {
+	// Key condition for the store ID
+	keyCondition := expression.Key("store_id").Equal(expression.Value(storeID))
+
+	builder := expression.NewBuilder().WithKeyCondition(keyCondition)
+
+	expr, err := builder.Build()
+	if err != nil {
+		return nil, err
+	}
+
+	input := &dynamodb.QueryInput{
+		TableName:                 aws.String(s.recordsTable),
+		KeyConditionExpression:    expr.KeyCondition(),
+		ExpressionAttributeNames:  expr.Names(),
+		ExpressionAttributeValues: expr.Values(),
+	}
+
+	if query.Limit > 0 {
+		input.Limit = aws.Int64(int64(query.Limit))
+	}
+
+	return input, nil
+}
+
 // UpdateRecord updates an existing record
 func (s *DynamoDBStore) UpdateRecord(ctx context.Context, storeID, recordID string, record *Record) error {
 	now := time.Now().Unix()
@@ -483,8 +568,13 @@ func (s *DynamoDBStore) UpdateRecord(ctx context.Context, storeID, recordID stri
 	// Build update expression
 	update := expression.Set(expression.Name("updated_at"), expression.Value(now))
 
-	if record.OwnerID != "" {
-		update = update.Set(expression.Name("owner_id"), expression.Value(record.OwnerID))
+	// Extract and update OwnerID from Properties if it exists
+	if record.Properties != nil {
+		if ownerIDVal, exists := record.Properties["owner_id"]; exists && ownerIDVal != nil {
+			if ownerIDStr, ok := ownerIDVal.(string); ok && ownerIDStr != "" {
+				update = update.Set(expression.Name("owner_id"), expression.Value(ownerIDStr))
+			}
+		}
 	}
 
 	if record.Tags != nil {
@@ -498,6 +588,16 @@ func (s *DynamoDBStore) UpdateRecord(ctx context.Context, storeID, recordID stri
 	if record.BlobKeys != nil {
 		update = update.Set(expression.Name("blob_keys"), expression.Value(record.BlobKeys))
 	}
+
+	// Extract and update GameID from Properties if it exists
+	if record.Properties != nil {
+		if gameIDVal, exists := record.Properties["game_id"]; exists && gameIDVal != nil {
+			if gameIDStr, ok := gameIDVal.(string); ok && gameIDStr != "" {
+				update = update.Set(expression.Name("game_id"), expression.Value(gameIDStr))
+			}
+		}
+	}
+
 
 	expr, err := expression.NewBuilder().WithUpdate(update).Build()
 	if err != nil {
