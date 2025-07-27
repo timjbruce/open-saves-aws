@@ -71,7 +71,7 @@ echo ""
 echo "Verifying prerequisites..."
 REQUIRED_PARAMS=(
     "/open-saves/step1/cluster_name"
-    "/open-saves/step2/documentdb_cluster_endpoint"
+    "/open-saves/step2/documentdb_endpoint"
     "/open-saves/step3/container_image_uri_${ARCHITECTURE}"
 )
 
