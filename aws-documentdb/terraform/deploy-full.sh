@@ -294,7 +294,7 @@ main() {
     
     # Step 2: Data Infrastructure
     if should_execute_step "2"; then
-        if confirm_step "Step 2" "Data Infrastructure (DynamoDB, S3, ElastiCache)"; then
+        if confirm_step "Step 2" "Data Infrastructure (DocumentDB, S3, ElastiCache)"; then
             print_status "Executing Step 2..."
             if ! "$SCRIPT_DIR/deploy-step2.sh" \
                 --region "$REGION" \
