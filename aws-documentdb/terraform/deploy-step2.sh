@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Deploy Step 2: Data Infrastructure
-# This step creates DynamoDB tables, S3 bucket, and ElastiCache Redis
+# This step creates DocumentDB cluster, S3 bucket, and ElastiCache Redis
 
 set -e
 
@@ -98,7 +98,7 @@ echo "Step 2 deployment completed successfully!"
 echo "=========================================="
 echo ""
 echo "Resources created:"
-echo "- DynamoDB tables (stores, records, metadata)"
+echo "- DocumentDB cluster with master user"
 echo "- S3 bucket for blob storage"
 echo "- ElastiCache Redis cluster ($ARCHITECTURE)"
 echo "- Security groups and subnet groups"

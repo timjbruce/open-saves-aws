@@ -1,21 +1,21 @@
-output "dynamodb_table_arns" {
-  description = "ARNs of the DynamoDB tables including GSI ARNs"
-  value = [
-    aws_dynamodb_table.stores.arn,
-    aws_dynamodb_table.records.arn,
-    aws_dynamodb_table.metadata.arn,
-    "${aws_dynamodb_table.records.arn}/index/GameIDIndex",
-    "${aws_dynamodb_table.records.arn}/index/OwnerIDIndex"
-  ]
+output "documentdb_cluster_endpoint" {
+  description = "DocumentDB cluster endpoint"
+  value       = aws_docdb_cluster.main.endpoint
 }
 
-output "dynamodb_table_names" {
-  description = "Names of the DynamoDB tables"
-  value = [
-    aws_dynamodb_table.stores.name,
-    aws_dynamodb_table.records.name,
-    aws_dynamodb_table.metadata.name
-  ]
+output "documentdb_cluster_port" {
+  description = "DocumentDB cluster port"
+  value       = aws_docdb_cluster.main.port
+}
+
+output "documentdb_cluster_master_username" {
+  description = "DocumentDB cluster master username"
+  value       = aws_docdb_cluster.main.master_username
+}
+
+output "documentdb_password_secret_arn" {
+  description = "ARN of the Secrets Manager secret containing DocumentDB password"
+  value       = aws_secretsmanager_secret.documentdb_password.arn
 }
 
 output "s3_bucket_arn" {
@@ -34,11 +34,11 @@ output "s3_bucket_name" {
 }
 
 output "redis_endpoint" {
-  description = "Redis cluster endpoint"
-  value       = "${aws_elasticache_cluster.redis.cache_nodes.0.address}:${aws_elasticache_cluster.redis.cache_nodes.0.port}"
+  description = "Redis cluster primary endpoint"
+  value       = aws_elasticache_replication_group.redis.primary_endpoint_address
 }
 
-output "parameter_store_name" {
-  description = "Name of the parameter store configuration"
-  value       = aws_ssm_parameter.config.name
+output "redis_port" {
+  description = "Redis cluster port"
+  value       = aws_elasticache_replication_group.redis.port
 }

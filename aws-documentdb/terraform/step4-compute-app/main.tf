@@ -61,10 +61,6 @@ data "aws_ssm_parameter" "documentdb_password_secret_arn" {
   name = "/open-saves/step2/documentdb_password_secret_arn"
 }
 
-data "aws_ssm_parameter" "dynamodb_table_names" {
-  name = "/open-saves/step2/dynamodb_table_names"
-}
-
 data "aws_ssm_parameter" "s3_bucket_arn" {
   name = "/open-saves/step2/s3_bucket_arn"
 }

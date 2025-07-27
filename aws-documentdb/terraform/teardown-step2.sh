@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Teardown Step 2: Data Infrastructure
-# This step destroys DynamoDB tables, S3 bucket, and ElastiCache Redis
+# This step destroys DocumentDB cluster, S3 bucket, and ElastiCache Redis
 
 set -e
 
@@ -119,14 +119,15 @@ rm -f destroy.tfplan
 
 # Clean up SSM parameters
 echo "Cleaning up SSM parameters..."
-aws ssm delete-parameter --name "/open-saves/step2/dynamodb_table_arns" --region "$REGION" 2>/dev/null || true
-aws ssm delete-parameter --name "/open-saves/step2/dynamodb_table_names" --region "$REGION" 2>/dev/null || true
+aws ssm delete-parameter --name "/open-saves/step2/documentdb_cluster_endpoint" --region "$REGION" 2>/dev/null || true
+aws ssm delete-parameter --name "/open-saves/step2/documentdb_cluster_port" --region "$REGION" 2>/dev/null || true
+aws ssm delete-parameter --name "/open-saves/step2/documentdb_cluster_master_username" --region "$REGION" 2>/dev/null || true
+aws ssm delete-parameter --name "/open-saves/step2/documentdb_password_secret_arn" --region "$REGION" 2>/dev/null || true
 aws ssm delete-parameter --name "/open-saves/step2/s3_bucket_arn" --region "$REGION" 2>/dev/null || true
 aws ssm delete-parameter --name "/open-saves/step2/s3_bucket_id" --region "$REGION" 2>/dev/null || true
 aws ssm delete-parameter --name "/open-saves/step2/s3_bucket_name" --region "$REGION" 2>/dev/null || true
 aws ssm delete-parameter --name "/open-saves/step2/redis_endpoint" --region "$REGION" 2>/dev/null || true
-aws ssm delete-parameter --name "/open-saves/step2/parameter_store_name" --region "$REGION" 2>/dev/null || true
-aws ssm delete-parameter --name "/etc/open-saves/config.yaml" --region "$REGION" 2>/dev/null || true
+aws ssm delete-parameter --name "/open-saves/step2/redis_port" --region "$REGION" 2>/dev/null || true
 
 echo ""
 echo "=========================================="
@@ -134,7 +135,7 @@ echo "Step 2 teardown completed successfully!"
 echo "=========================================="
 echo ""
 echo "Resources destroyed:"
-echo "- DynamoDB tables (stores, records, metadata)"
+echo "- DocumentDB cluster and instances"
 echo "- S3 bucket for blob storage"
 if [ "$EMPTY_S3" = "true" ]; then
     echo "- S3 bucket contents (emptied)"

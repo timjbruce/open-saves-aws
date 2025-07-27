@@ -301,16 +301,16 @@ resource "aws_cloudwatch_dashboard" "open_saves_eks" {
         height = 6
         properties = {
           metrics = [
-            ["AWS/DynamoDB", "ConsumedReadCapacityUnits", "TableName", "open-saves-stores"],
-            ["AWS/DynamoDB", "ConsumedReadCapacityUnits", "TableName", "open-saves-records"],
-            ["AWS/DynamoDB", "ConsumedReadCapacityUnits", "TableName", "open-saves-metadata"]
+            ["AWS/DocDB", "DatabaseConnections", "DBClusterIdentifier", "open-saves-docdb-cluster"],
+            ["AWS/DocDB", "ReadLatency", "DBClusterIdentifier", "open-saves-docdb-cluster"],
+            ["AWS/DocDB", "WriteLatency", "DBClusterIdentifier", "open-saves-docdb-cluster"]
           ]
           view    = "timeSeries"
           stacked = false
           region  = var.region
-          title   = "DynamoDB - Read Capacity Units"
+          title   = "DocumentDB - Connections and Latency"
           period  = 60
-          stat    = "Sum"
+          stat    = "Average"
         }
       },
       {
@@ -321,16 +321,16 @@ resource "aws_cloudwatch_dashboard" "open_saves_eks" {
         height = 6
         properties = {
           metrics = [
-            ["AWS/DynamoDB", "ConsumedWriteCapacityUnits", "TableName", "open-saves-stores"],
-            ["AWS/DynamoDB", "ConsumedWriteCapacityUnits", "TableName", "open-saves-records"],
-            ["AWS/DynamoDB", "ConsumedWriteCapacityUnits", "TableName", "open-saves-metadata"]
+            ["AWS/DocDB", "ReadThroughput", "DBClusterIdentifier", "open-saves-docdb-cluster"],
+            ["AWS/DocDB", "WriteThroughput", "DBClusterIdentifier", "open-saves-docdb-cluster"],
+            ["AWS/DocDB", "VolumeReadIOPs", "DBClusterIdentifier", "open-saves-docdb-cluster"]
           ]
           view    = "timeSeries"
           stacked = false
           region  = var.region
-          title   = "DynamoDB - Write Capacity Units"
+          title   = "DocumentDB - Throughput and IOPS"
           period  = 60
-          stat    = "Sum"
+          stat    = "Average"
         }
       },
       {
