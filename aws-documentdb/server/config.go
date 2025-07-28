@@ -41,7 +41,8 @@ type Config struct {
 // LoadConfig loads the configuration from a file or Parameter Store
 func LoadConfig(path string) (*Config, error) {
 	// Check if the path is a Parameter Store path
-	if strings.HasPrefix(path, "/") && !strings.HasPrefix(path, "./") && !strings.HasPrefix(path, "../") {
+	// Parameter Store paths typically don't have file extensions and follow AWS parameter naming
+	if strings.HasPrefix(path, "/") && !strings.Contains(path, ".") && !strings.HasPrefix(path, "./") && !strings.HasPrefix(path, "../") {
 		return loadConfigFromParameterStore(path)
 	}
 

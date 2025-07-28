@@ -439,8 +439,10 @@ resource "kubernetes_deployment" "open_saves" {
               # Get DocumentDB password from Secrets Manager
               PASSWORD=$(aws secretsmanager get-secret-value --secret-id ${data.aws_ssm_parameter.documentdb_password_secret_arn.value} --query SecretString --output text)
               
-              # Replace PASSWORD_PLACEHOLDER in config file
-              sed "s/PASSWORD_PLACEHOLDER/$PASSWORD/g" /etc/open-saves-template/config.yaml > /etc/open-saves/config.yaml
+              # Replace PASSWORD_PLACEHOLDER in config file using a more robust method
+              # Escape special characters in the password for sed
+              ESCAPED_PASSWORD=$(printf '%s\n' "$PASSWORD" | sed 's/[[\.*^$()+?{|]/\\&/g')
+              sed "s/PASSWORD_PLACEHOLDER/$ESCAPED_PASSWORD/g" /etc/open-saves-template/config.yaml > /etc/open-saves/config.yaml
               
               echo "Configuration file updated with DocumentDB password"
             EOT
