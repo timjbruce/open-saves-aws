@@ -89,3 +89,4 @@ aws/open-saves-aws-arm64
 # Simple test directory - untracked
 simpletest/
 /plan/
+aws-documentdb/global-bundle.pem
