@@ -88,4 +88,4 @@ aws/open-saves-aws-arm64
 
 # Simple test directory - untracked
 simpletest/
-plan/LOADTESTING.md
+/plan/
