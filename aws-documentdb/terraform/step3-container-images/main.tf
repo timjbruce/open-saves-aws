@@ -29,6 +29,18 @@ data "aws_ssm_parameter" "redis_endpoint" {
   name = "/open-saves/step2/redis_endpoint"
 }
 
+data "aws_ssm_parameter" "documentdb_endpoint" {
+  name = "/open-saves/step2/documentdb_endpoint"
+}
+
+data "aws_ssm_parameter" "documentdb_port" {
+  name = "/open-saves/step2/documentdb_port"
+}
+
+data "aws_ssm_parameter" "documentdb_username" {
+  name = "/open-saves/step2/documentdb_username"
+}
+
 # Build and push container images
 resource "null_resource" "build_and_push_image" {
   triggers = {
@@ -62,10 +74,9 @@ server:
 
 aws:
   region: "${var.region}"
-  dynamodb:
-    stores_table: "open-saves-stores"
-    records_table: "open-saves-records"
-    metadata_table: "open-saves-metadata"
+  documentdb:
+    connection_string: "mongodb://${data.aws_ssm_parameter.documentdb_username.value}:PASSWORD_PLACEHOLDER@${data.aws_ssm_parameter.documentdb_endpoint.value}:${data.aws_ssm_parameter.documentdb_port.value}/?ssl=true&replicaSet=rs0&readPreference=secondaryPreferred&retryWrites=false"
+    database_name: "open-saves"
   s3:
     bucket_name: "$S3_BUCKET_NAME"
   elasticache:
@@ -105,7 +116,6 @@ resource "aws_ssm_parameter" "container_image_uri" {
   name      = "/open-saves/step3/container_image_uri_${var.architecture}"
   type      = "String"
   value     = "${data.aws_ssm_parameter.ecr_repo_uri.value}:${var.architecture}"
-  overwrite = true
 
   tags = {
     Environment  = var.environment

@@ -72,7 +72,6 @@ terraform/config/
 **/config/*.yml
 
 # Planning and documentation
-/plan/
 
 # Container images and build artifacts
 *.tar
@@ -86,3 +85,7 @@ aws/container-images/
 **/docker-images/
 aws/open-saves-aws
 aws/open-saves-aws-arm64
+
+# Simple test directory - untracked
+simpletest/
+plan/LOADTESTING.md

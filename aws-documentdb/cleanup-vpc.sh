@@ -1,0 +1,98 @@
+#!/bin/bash
+set -e
+
+# Colors for output
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
+
+VPC_ID="vpc-0480770936ff81fe0"
+REGION="us-west-2"
+
+echo -e "${YELLOW}=== VPC Cleanup Script ===${NC}"
+echo -e "${YELLOW}This script will delete the VPC and all associated resources${NC}"
+echo -e "${RED}WARNING: This will delete all resources in the VPC!${NC}"
+read -p "Are you sure you want to continue? (y/n) " -n 1 -r
+echo
+if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    echo -e "${YELLOW}Cleanup aborted.${NC}"
+    exit 1
+fi
+
+# Step 1: Delete security groups (except default)
+echo -e "${YELLOW}Step 1: Deleting security groups...${NC}"
+SG_IDS=$(aws ec2 describe-security-groups --region $REGION --filters "Name=vpc-id,Values=$VPC_ID" --query 'SecurityGroups[?GroupName!=`default`].GroupId' --output text)
+for SG_ID in $SG_IDS; do
+    echo "Deleting security group $SG_ID"
+    aws ec2 delete-security-group --region $REGION --group-id $SG_ID || echo "Failed to delete $SG_ID, continuing..."
+done
+echo -e "${GREEN}Security groups deleted.${NC}"
+
+# Step 2: Delete NAT gateways if any
+echo -e "${YELLOW}Step 2: Deleting NAT gateways...${NC}"
+NAT_IDS=$(aws ec2 describe-nat-gateways --region $REGION --filter "Name=vpc-id,Values=$VPC_ID" --query 'NatGateways[?State!=`deleted`].NatGatewayId' --output text)
+for NAT_ID in $NAT_IDS; do
+    echo "Deleting NAT gateway $NAT_ID"
+    aws ec2 delete-nat-gateway --region $REGION --nat-gateway-id $NAT_ID
+done
+
+if [ -n "$NAT_IDS" ]; then
+    echo "Waiting for NAT gateways to be deleted..."
+    sleep 30
+fi
+echo -e "${GREEN}NAT gateways deleted.${NC}"
+
+# Step 3: Delete any remaining network interfaces
+echo -e "${YELLOW}Step 3: Deleting network interfaces...${NC}"
+ENI_IDS=$(aws ec2 describe-network-interfaces --region $REGION --filters "Name=vpc-id,Values=$VPC_ID" --query 'NetworkInterfaces[].NetworkInterfaceId' --output text)
+for ENI_ID in $ENI_IDS; do
+    echo "Deleting network interface $ENI_ID"
+    aws ec2 delete-network-interface --region $REGION --network-interface-id $ENI_ID || echo "Failed to delete $ENI_ID, continuing..."
+done
+echo -e "${GREEN}Network interfaces deleted.${NC}"
+
+# Step 4: Detach and delete internet gateway
+echo -e "${YELLOW}Step 4: Detaching and deleting internet gateway...${NC}"
+IGW_ID=$(aws ec2 describe-internet-gateways --region $REGION --filters "Name=attachment.vpc-id,Values=$VPC_ID" --query 'InternetGateways[].InternetGatewayId' --output text)
+if [ -n "$IGW_ID" ]; then
+    echo "Detaching internet gateway $IGW_ID"
+    aws ec2 detach-internet-gateway --region $REGION --internet-gateway-id $IGW_ID --vpc-id $VPC_ID
+    echo "Deleting internet gateway $IGW_ID"
+    aws ec2 delete-internet-gateway --region $REGION --internet-gateway-id $IGW_ID
+    echo -e "${GREEN}Internet gateway deleted.${NC}"
+else
+    echo -e "${YELLOW}No internet gateway found.${NC}"
+fi
+
+# Step 5: Delete subnets
+echo -e "${YELLOW}Step 5: Deleting subnets...${NC}"
+SUBNET_IDS=$(aws ec2 describe-subnets --region $REGION --filters "Name=vpc-id,Values=$VPC_ID" --query 'Subnets[].SubnetId' --output text)
+for SUBNET_ID in $SUBNET_IDS; do
+    echo "Deleting subnet $SUBNET_ID"
+    aws ec2 delete-subnet --region $REGION --subnet-id $SUBNET_ID
+done
+echo -e "${GREEN}Subnets deleted.${NC}"
+
+# Step 6: Delete route tables (except main)
+echo -e "${YELLOW}Step 6: Deleting route tables...${NC}"
+RT_IDS=$(aws ec2 describe-route-tables --region $REGION --filters "Name=vpc-id,Values=$VPC_ID" --query 'RouteTables[?Associations[0].Main!=`true`].RouteTableId' --output text)
+for RT_ID in $RT_IDS; do
+    # First, disassociate any subnet associations
+    ASSOC_IDS=$(aws ec2 describe-route-tables --region $REGION --route-table-ids $RT_ID --query 'RouteTables[].Associations[?Main!=`true`].RouteTableAssociationId' --output text)
+    for ASSOC_ID in $ASSOC_IDS; do
+        echo "Disassociating route table association $ASSOC_ID"
+        aws ec2 disassociate-route-table --region $REGION --association-id $ASSOC_ID
+    done
+    
+    echo "Deleting route table $RT_ID"
+    aws ec2 delete-route-table --region $REGION --route-table-id $RT_ID
+done
+echo -e "${GREEN}Route tables deleted.${NC}"
+
+# Step 7: Delete VPC
+echo -e "${YELLOW}Step 7: Deleting VPC...${NC}"
+aws ec2 delete-vpc --region $REGION --vpc-id $VPC_ID
+echo -e "${GREEN}VPC deleted.${NC}"
+
+echo -e "${GREEN}=== VPC Cleanup Complete ===${NC}"
