@@ -14,7 +14,7 @@ CLUSTER_NAME="open-saves-cluster"
 ECR_REPO_NAME="open-saves"
 NAMESPACE="open-saves"
 ENVIRONMENT="dev"
-SOURCE_PATH="/home/ec2-user/projects/open-saves-aws/aws"
+SOURCE_PATH="/home/ec2-user/projects/open-saves-aws/aws/dynamodb"
 SKIP_STEPS=""
 ONLY_STEPS=""
 

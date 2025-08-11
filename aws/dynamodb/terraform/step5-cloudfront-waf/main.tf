@@ -433,11 +433,7 @@ resource "aws_cloudwatch_dashboard" "open_saves_security" {
     ]
   })
 
-  tags = {
-    Name        = "open-saves-security-dashboard-${var.architecture}"
-    Environment = var.environment
-    Project     = "open-saves"
-  }
+
 }
 
 # Store outputs in SSM Parameter Store for reference

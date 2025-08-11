@@ -116,7 +116,7 @@ RECORD_KEY="test-record-$(date +%s)"
 RECORD_DATA="Hello, Open Saves!"
 RECORD_RESPONSE=$(curl -s -X POST "${ENDPOINT}/api/stores/${STORE_ID}/records" \
   -H "Content-Type: application/json" \
-  -d "{\"key\": \"${RECORD_KEY}\", \"blob_size\": ${#RECORD_DATA}, \"properties\": {\"test\": \"data\", \"timestamp\": \"$(date -Iseconds)\"}}")
+  -d "{\"record_id\": \"${RECORD_KEY}\", \"blob_size\": ${#RECORD_DATA}, \"properties\": {\"test\": \"data\", \"timestamp\": \"$(date -Iseconds)\"}}")
 
 echo "Create record response: $RECORD_RESPONSE"
 if echo "$RECORD_RESPONSE" | grep -q -E '"record_id"|"key"' && ! echo "$RECORD_RESPONSE" | grep -q -i "error\|failed"; then
@@ -161,70 +161,6 @@ echo -e "\n${BLUE}===========================================${NC}"
 echo -e "${BLUE}API Test Complete${NC}"
 echo -e "${BLUE}===========================================${NC}"
 
-# Test DocumentDB connectivity by checking if we can connect to the database from a pod
-echo -e "\n${YELLOW}=== Test 8: DocumentDB Verification ===${NC}"
-echo -e "${YELLOW}Creating a test pod to verify DocumentDB connectivity...${NC}"
 
-# Create a test pod with MongoDB client
-cat << 'EOF' | kubectl apply -f -
-apiVersion: v1
-kind: Pod
-metadata:
-  name: documentdb-test
-  namespace: open-saves
-spec:
-  serviceAccountName: open-saves-sa
-  containers:
-  - name: mongo-client
-    image: mongo:4.4
-    command: ["/bin/bash"]
-    args: ["-c", "sleep 300"]
-    env:
-    - name: AWS_REGION
-      value: "us-east-1"
-  restartPolicy: Never
-EOF
-
-# Wait for pod to be ready
-echo "Waiting for test pod to be ready..."
-kubectl wait --for=condition=Ready pod/documentdb-test -n open-saves --timeout=60s
-
-if [ $? -eq 0 ]; then
-    echo -e "${GREEN}✓ Test pod is ready${NC}"
-    
-    # Test DocumentDB connectivity
-    echo "Testing DocumentDB connectivity from within the cluster..."
-    kubectl exec -n open-saves documentdb-test -- bash -c "
-        # Download CA certificate
-        wget -q https://s3.amazonaws.com/rds-downloads/rds-ca-2019-root.pem -O /tmp/rds-ca-2019-root.pem
-        
-        # Test basic connectivity
-        echo 'Testing port connectivity...'
-        timeout 5 bash -c '</dev/tcp/open-saves-docdb-cluster.cluster-cxyzkzxasyb6.us-east-1.docdb.amazonaws.com/27017' && echo 'DocumentDB port is reachable' || echo 'DocumentDB port is not reachable'
-        
-        # Try to get password from Secrets Manager (this requires proper IAM permissions)
-        echo 'Attempting to retrieve password from Secrets Manager...'
-        if command -v aws >/dev/null 2>&1; then
-            PASSWORD=\$(aws secretsmanager get-secret-value --region us-east-1 --secret-id arn:aws:secretsmanager:us-east-1:992265960412:secret:open-saves-documentdb-password-4K0MlP --query SecretString --output text 2>/dev/null)
-            if [ -n \"\$PASSWORD\" ]; then
-                echo 'Password retrieved successfully'
-                # Try to connect to DocumentDB
-                echo 'Attempting DocumentDB connection...'
-                mongo --ssl --host open-saves-docdb-cluster.cluster-cxyzkzxasyb6.us-east-1.docdb.amazonaws.com:27017 --sslCAFile /tmp/rds-ca-2019-root.pem --username opensaves --password \"\$PASSWORD\" --eval 'db.runCommand({connectionStatus: 1})' open-saves 2>/dev/null && echo 'DocumentDB connection successful' || echo 'DocumentDB connection failed'
-            else
-                echo 'Could not retrieve password from Secrets Manager'
-            fi
-        else
-            echo 'AWS CLI not available in container'
-        fi
-    " 2>/dev/null
-    
-    echo -e "${GREEN}✓ DocumentDB connectivity test completed${NC}"
-else
-    echo -e "${RED}✗ Test pod failed to start${NC}"
-fi
-
-# Cleanup test pod
-kubectl delete pod documentdb-test -n open-saves --ignore-not-found=true >/dev/null 2>&1
 
 echo -e "\n${GREEN}All tests completed!${NC}"

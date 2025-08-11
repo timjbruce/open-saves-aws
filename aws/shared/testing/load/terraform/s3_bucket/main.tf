@@ -9,15 +9,22 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 4.0"
     }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.1"
+    }
   }
 }
 
+# Get current AWS account ID
+data "aws_caller_identity" "current" {}
+
 # Create S3 bucket for Locust scripts
 resource "aws_s3_bucket" "locust_scripts" {
-  bucket = "open-saves-locust-scripts-${var.environment}"
+  bucket = "opensaves-locust-${data.aws_caller_identity.current.account_id}"
 
   tags = {
-    Name        = "open-saves-locust-scripts"
+    Name        = "opensaves-locust-scripts"
     Environment = var.environment
   }
 }
@@ -67,9 +74,6 @@ resource "aws_s3_bucket_policy" "locust_scripts" {
     ]
   })
 }
-
-# Get current AWS account ID
-data "aws_caller_identity" "current" {}
 
 # Output the bucket name
 output "bucket_name" {

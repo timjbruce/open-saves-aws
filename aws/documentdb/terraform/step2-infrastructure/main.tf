@@ -105,7 +105,7 @@ resource "random_password" "documentdb_password" {
 
 # Store DocumentDB password in Secrets Manager
 resource "aws_secretsmanager_secret" "documentdb_password" {
-  name        = "open-saves-documentdb-password"
+  name        = "open-saves-documentdb-password-${formatdate("YYYY-MM-DD-hhmm", timestamp())}"
   description = "Password for Open Saves DocumentDB cluster"
 
   tags = {

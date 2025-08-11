@@ -18,7 +18,23 @@ The load testing environment consists of:
 
 ## Deployment
 
-### Deploy EC2 Locust Infrastructure
+### Step 1: Deploy S3 Bucket for Locust Scripts
+
+First, deploy the S3 bucket that will store the Locust scripts:
+
+```bash
+./deploy-s3-bucket.sh [--region REGION]
+```
+
+Optional parameters:
+- `--region`: AWS region to deploy to (default: from AWS config or us-west-2)
+
+This script will:
+1. Create an S3 bucket for storing Locust scripts
+2. Upload the Locust Python scripts and shell scripts to the bucket
+3. Configure the bucket for EC2 instance access
+
+### Step 2: Deploy EC2 Locust Infrastructure
 
 ```bash
 ./deploy-ec2-locust.sh --endpoint ENDPOINT [options]

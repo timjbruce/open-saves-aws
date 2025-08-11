@@ -6,7 +6,7 @@ This is the AWS implementation of Open Saves, a cloud-based storage solution for
 
 Open Saves AWS uses the following AWS services:
 - Amazon EKS for container orchestration
-- Amazon DynamoDB for metadata and small record storage
+- Amazon DocumentDB for metadata and record storage
 - Amazon S3 for blob storage
 - Amazon ElastiCache Redis for caching
 - Amazon CloudFront and WAF for security and performance
@@ -16,7 +16,7 @@ Open Saves AWS uses the following AWS services:
 The Open Saves AWS implementation follows a completely independent step-based architecture:
 
 1. **Step 1 - EKS Cluster and ECR**: VPC, subnets, EKS cluster, and ECR repository
-2. **Step 2 - Data Infrastructure**: DynamoDB tables, S3 bucket, and ElastiCache Redis
+2. **Step 2 - Data Infrastructure**: DocumentDB cluster with collections, S3 bucket, and ElastiCache Redis
 3. **Step 3 - Container Images**: Build and push Open Saves container images
 4. **Step 4 - Compute and Application**: EKS node groups, Kubernetes resources, and application deployment
 5. **Step 5 - CloudFront and WAF**: CDN and security layer for production traffic
@@ -92,7 +92,10 @@ cd terraform
 - Sets up IAM roles and networking components
 
 ### Step 2: Data Infrastructure
-- Creates DynamoDB tables (stores, records, metadata) with GSIs
+- Creates DocumentDB cluster with three collections:
+  - **stores**: Store metadata and configuration
+  - **records**: Game save records and properties  
+  - **metadata**: Additional metadata for stores and records
 - Deploys S3 bucket with security configurations
 - Sets up ElastiCache Redis cluster (architecture-specific)
 - Configures security groups and parameter store
@@ -190,7 +193,7 @@ The system supports easy switching between architectures by tearing down and red
 - WAF blocked/counted requests
 - CloudFront request volume and error rates
 - EKS node and pod health
-- DynamoDB throttling and errors
+- DocumentDB connection and query performance
 - S3 request metrics
 - ElastiCache performance
 
@@ -201,7 +204,7 @@ The system supports easy switching between architectures by tearing down and red
 ## Security Features
 
 ### IAM Policies (Principle of Least Privilege)
-- **DynamoDB**: Specific table and GSI access only
+- **DocumentDB**: Access to specific cluster and database only
 - **S3**: Bucket and object-level permissions for blob operations
 - **SSM**: Read-only access to Open Saves parameters only
 
@@ -254,7 +257,7 @@ cd terraform-old-approach
 aws/
 ├── terraform/                    # Independent Terraform steps
 │   ├── step1-cluster-ecr/       # EKS cluster and ECR
-│   ├── step2-infrastructure/    # DynamoDB, S3, ElastiCache
+│   ├── step2-infrastructure/    # DocumentDB, S3, ElastiCache
 │   ├── step3-container-images/  # Container image builds
 │   ├── step4-compute-app/       # EKS nodes and application
 │   ├── step5-cloudfront-waf/    # CloudFront and WAF

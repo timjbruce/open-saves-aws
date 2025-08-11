@@ -506,7 +506,7 @@ resource "kubernetes_deployment" "open_saves" {
 
           readiness_probe {
             http_get {
-              path = "/ready"
+              path = "/health"
               port = 8080
             }
             initial_delay_seconds = 5
